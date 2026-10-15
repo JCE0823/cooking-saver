@@ -107,6 +107,7 @@ export function App() {
               <button type="button" onClick={signOut}>Sign Out</button>
             </nav>
           </header>
+          {error ? <p role="alert" className="session-message">{error}</p> : null}
           <main>
             <Routes>
               <Route path="/" element={<SearchPage />} />

@@ -80,4 +80,16 @@ describe("application shell", () => {
     expect(signOut).toHaveBeenCalledOnce();
     expect(await screen.findByRole("heading", { name: /sign in to cooking saver/i })).toBeVisible();
   });
+
+  it("shows an alert when sign out fails", async () => {
+    vi.spyOn(api, "getPublicConfig").mockResolvedValue({ googleClientId: "client-123" });
+    vi.spyOn(api, "getSession").mockResolvedValue({ user: normalUser });
+    vi.spyOn(api, "signOut").mockRejectedValue(new Error("offline"));
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /sign out/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn’t sign you out right now/i);
+    expect(screen.getByRole("navigation", { name: /main/i })).toBeVisible();
+  });
 });
