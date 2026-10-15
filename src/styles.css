@@ -90,6 +90,30 @@ main {
   padding: 2rem 0 4rem;
 }
 
+.sign-in-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem 1rem;
+}
+
+.sign-in-card {
+  width: min(100%, 28rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(92, 52, 30, 0.08);
+  padding: 1.5rem;
+}
+
+.sign-in-card form {
+  margin-top: 1.25rem;
+}
+
+.sign-in-card button {
+  margin-top: 0.4rem;
+}
+
 h1,
 h2,
 h3 {

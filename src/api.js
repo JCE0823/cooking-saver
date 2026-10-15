@@ -1,11 +1,34 @@
-async function requestJSON(url, options = {}) {
-  const response = await fetch(url, {
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "");
+
+let credentials;
+
+export function setCredentials({ username, password }) {
+  credentials = { username, password };
+}
+
+export function clearCredentials() {
+  credentials = undefined;
+}
+
+function authorizationHeader() {
+  if (!credentials) return undefined;
+  return `Basic ${globalThis.btoa(`${credentials.username}:${credentials.password}`)}`;
+}
+
+async function requestJSON(path, options = {}) {
+  const headers = {
+    Accept: "application/json",
+    ...(options.body ? { "Content-Type": "application/json" } : {}),
+    ...options.headers
+  };
+  const authorization = authorizationHeader();
+  if (authorization) headers.Authorization = authorization;
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: {
-      Accept: "application/json",
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers
-    }
+    headers
   });
 
   const text = await response.text();
@@ -36,6 +59,16 @@ export function searchRecipes(query) {
 
 export function listRecipes() {
   return requestJSON("/api/recipes");
+}
+
+export async function verifyCredentials(username, password) {
+  setCredentials({ username, password });
+  try {
+    return await listRecipes();
+  } catch (error) {
+    clearCredentials();
+    throw error;
+  }
 }
 
 export function getRecipe(id) {
