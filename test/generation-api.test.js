@@ -15,6 +15,7 @@ const validRecipe = {
   ingredients: [{ quantity: "1 cup", name: "brown lentils" }],
   instructions: ["Simmer the lentils until tender."]
 };
+const auth = { username: "student", password: "correct horse battery staple" };
 
 let pool;
 
@@ -25,7 +26,7 @@ afterEach(async () => {
 async function createTestApp(options = {}) {
   pool = createTestPool();
   await migrateDatabase(pool);
-  return createApp({ repository: createRecipeRepository(pool), ...options });
+  return createApp({ repository: createRecipeRepository(pool), auth, ...options });
 }
 
 describe("recipe generation API", () => {
@@ -39,6 +40,7 @@ describe("recipe generation API", () => {
 
     const response = await request(app)
       .post("/api/generate")
+      .auth(auth.username, auth.password)
       .send({ dishName: "Ethiopian lentil stew" })
       .expect(200);
 
@@ -56,6 +58,7 @@ describe("recipe generation API", () => {
 
     const response = await request(app)
       .post("/api/generate")
+      .auth(auth.username, auth.password)
       .send({ dishName: "Soup" })
       .expect(502);
 
@@ -67,6 +70,7 @@ describe("recipe generation API", () => {
 
     await request(app)
       .post("/api/generate")
+      .auth(auth.username, auth.password)
       .send({ dishName: "Soup" })
       .expect(503, { error: "generation_unavailable" });
   });
@@ -75,8 +79,10 @@ describe("recipe generation API", () => {
     const generateRecipe = vi.fn().mockResolvedValue(validRecipe);
     const app = await createTestApp({ generateRecipe });
 
-    await request(app).post("/api/generate").send({ dishName: "   " }).expect(400);
-    await request(app).post("/api/generate").send({ dishName: "x".repeat(101) }).expect(400);
+    await request(app).post("/api/generate").auth(auth.username, auth.password)
+      .send({ dishName: "   " }).expect(400);
+    await request(app).post("/api/generate").auth(auth.username, auth.password)
+      .send({ dishName: "x".repeat(101) }).expect(400);
     expect(generateRecipe).not.toHaveBeenCalled();
   });
 
@@ -84,7 +90,8 @@ describe("recipe generation API", () => {
     const generateRecipe = vi.fn().mockResolvedValue({ ...validRecipe, ingredients: [] });
     const app = await createTestApp({ generateRecipe });
 
-    await request(app).post("/api/generate").send({ dishName: "Soup" }).expect(502, {
+    await request(app).post("/api/generate").auth(auth.username, auth.password)
+      .send({ dishName: "Soup" }).expect(502, {
       error: "generation_failed"
     });
     const result = await pool.query("SELECT COUNT(*)::int AS count FROM recipes WHERE source = 'ai'");

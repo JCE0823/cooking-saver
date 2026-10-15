@@ -2,12 +2,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import { execPath } from "node:process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 const serverEntryPoint = join(projectRoot, "server", "index.js");
+const auth = { username: "student", password: "correct horse battery staple" };
+const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 const validRecipe = {
   name: "Tomato Soup",
   prepMinutes: 10,
@@ -19,10 +19,18 @@ const validRecipe = {
   instructions: ["Chop the tomatoes.", "Simmer until tender."]
 };
 
-export function startServer(databasePath) {
+export function startServer(connectionString) {
   const child = spawn(execPath, [serverEntryPoint], {
     cwd: projectRoot,
-    env: { ...process.env, PORT: "0", DATABASE_PATH: databasePath },
+    env: {
+      ...process.env,
+      PORT: "0",
+      DATABASE_URL: connectionString,
+      BASIC_AUTH_USERNAME: auth.username,
+      BASIC_AUTH_PASSWORD: auth.password,
+      FRONTEND_ORIGIN: "http://localhost:5173",
+      RENDER_GIT_COMMIT: "test"
+    },
     stdio: ["ignore", "pipe", "pipe"]
   });
 
@@ -72,10 +80,17 @@ export function stopServer(child) {
   });
 }
 
-async function postJson(url, path, body) {
+function authorizationHeader({ username, password }) {
+  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+}
+
+async function postJson(url, path, body, credentials) {
   const response = await fetch(`${url}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: authorizationHeader(credentials)
+    },
     body: JSON.stringify(body)
   });
   expect(response.ok).toBe(true);
@@ -83,34 +98,42 @@ async function postJson(url, path, body) {
 }
 
 async function getJson(url, path) {
-  const response = await fetch(`${url}${path}`);
+  const response = await fetch(`${url}${path}`, {
+    headers: { authorization: authorizationHeader(auth) }
+  });
   expect(response.ok).toBe(true);
   return response.json();
 }
 
+async function request(url, path, method) {
+  const response = await fetch(`${url}${path}`, {
+    method,
+    headers: { authorization: authorizationHeader(auth) }
+  });
+  expect(response.ok).toBe(true);
+}
+
 describe("server restart persistence", () => {
-  let tempDirectory;
   let server;
 
   afterAll(async () => {
     if (server) await stopServer(server.child);
-    if (tempDirectory) await rm(tempDirectory, { recursive: true, force: true });
   });
 
-  it("keeps recipe data and app-recorded views after a server restart", async () => {
-    tempDirectory = await mkdtemp(join(tmpdir(), "cooking-saver-"));
-    const databasePath = join(tempDirectory, "restart.sqlite");
-    server = await startServer(databasePath);
+  it.skipIf(!databaseUrl)("keeps recipe data and app-recorded views after a server restart", async () => {
+    server = await startServer(databaseUrl);
 
-    const created = await postJson(server.url, "/api/recipes", validRecipe);
+    const created = await postJson(server.url, "/api/recipes", validRecipe, auth);
     const viewed = await getJson(server.url, `/api/recipes/${created.id}`);
     expect(viewed.viewCount).toBe(1);
 
     await stopServer(server.child);
-    server = await startServer(databasePath);
+    server = await startServer(databaseUrl);
 
     const afterRestart = await getJson(server.url, `/api/recipes/${created.id}`);
     expect(afterRestart.name).toBe("Tomato Soup");
     expect(afterRestart.viewCount).toBe(2);
+
+    await request(server.url, `/api/recipes/${created.id}`, "DELETE");
   });
 });

@@ -4,11 +4,12 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "start": "npm run build && node server/index.js",
+    "start": "node server/index.js",
     "dev": "vite",
     "test": "vitest run"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "latest",
     "express": "latest",
     "openai": "latest",

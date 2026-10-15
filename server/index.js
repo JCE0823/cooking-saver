@@ -1,38 +1,52 @@
 import "dotenv/config";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { createAiGenerator } from "./ai-generator.js";
 import { createApp } from "./app.js";
-import { openDatabase } from "./db.js";
+import { createRecipeRepository } from "./recipe-repository.js";
+import { migrateDatabase, openDatabase, seedStarterRecipes } from "./db.js";
+import { loadConfig } from "./config.js";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const databasePath = path.resolve(projectRoot, process.env.DATABASE_PATH || "./data/cooking-saver.sqlite");
-mkdirSync(path.dirname(databasePath), { recursive: true });
+function safeError(error) {
+  return { name: error?.name, code: error?.code, stack: error?.stack };
+}
 
-const db = openDatabase(databasePath);
-const hasUmgptConfiguration = [process.env.UMGPT_API_KEY, process.env.UMGPT_MODEL]
-  .every((value) => typeof value === "string" && value.trim() !== "");
-const generateRecipe = hasUmgptConfiguration
-  ? createAiGenerator({
-      apiKey: process.env.UMGPT_API_KEY,
-      model: process.env.UMGPT_MODEL,
-      baseURL: process.env.UMGPT_BASE_URL
-    })
-  : undefined;
-const app = createApp({ db, generateRecipe });
-const port = Number(process.env.PORT || 3000);
+let pool;
+let server;
+let shuttingDown = false;
 
-const server = app.listen(port, () => {
-  console.log(`LISTENING ${server.address().port}`);
-});
-
-function shutdown() {
-  server.close(() => {
-    db.close();
-    process.exit(0);
-  });
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await pool?.end();
+  process.exit(0);
 }
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+
+async function start() {
+  try {
+    const config = loadConfig(process.env);
+    pool = openDatabase(config.databaseUrl);
+    await migrateDatabase(pool);
+    await seedStarterRecipes(pool);
+    const repository = createRecipeRepository(pool);
+    const app = createApp({
+      repository,
+      auth: { username: config.username, password: config.password },
+      allowedOrigins: config.allowedOrigins,
+      commit: config.commit
+    });
+
+    server = app.listen(config.port, "0.0.0.0", () => {
+      console.log(`LISTENING ${server.address().port}`);
+    });
+  } catch (error) {
+    console.error(safeError(error));
+    await pool?.end();
+    process.exitCode = 1;
+  }
+}
+
+start();
