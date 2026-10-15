@@ -98,33 +98,35 @@ describe("API authentication and deployment metadata", () => {
 
   it("validates deployment configuration without exposing values", () => {
     expect(() => loadConfig({ DATABASE_URL: "postgres://private" })).toThrow(
-      "BASIC_AUTH_USERNAME, BASIC_AUTH_PASSWORD, FRONTEND_ORIGIN"
+      "GOOGLE_CLIENT_ID, OWNER_EMAIL, FRONTEND_ORIGIN"
     );
 
     expect(loadConfig({
       DATABASE_URL: "postgres://private",
-      BASIC_AUTH_USERNAME: credentials.username,
-      BASIC_AUTH_PASSWORD: credentials.password,
+      GOOGLE_CLIENT_ID: "google-client-id",
+      OWNER_EMAIL: " Owner@Example.com ",
       FRONTEND_ORIGIN: "https://frontend.example",
       RENDER_GIT_COMMIT: "abc123",
-      PORT: "4312"
+      PORT: "4312",
+      NODE_ENV: "development"
     })).toEqual({
       databaseUrl: "postgres://private",
-      username: credentials.username,
-      password: credentials.password,
+      googleClientId: "google-client-id",
+      ownerEmail: "owner@example.com",
       allowedOrigins: [
         "https://frontend.example",
         "http://localhost:5173",
         "http://127.0.0.1:5173"
       ],
+      secureCookies: false,
       commit: "abc123",
       port: 4312
     });
 
     expect(() => loadConfig({
       DATABASE_URL: "postgres://private",
-      BASIC_AUTH_USERNAME: credentials.username,
-      BASIC_AUTH_PASSWORD: credentials.password,
+      GOOGLE_CLIENT_ID: "google-client-id",
+      OWNER_EMAIL: "owner@example.com",
       FRONTEND_ORIGIN: " , "
     })).toThrow("FRONTEND_ORIGIN must contain at least one origin");
   });

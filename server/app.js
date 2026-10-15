@@ -4,8 +4,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createBasicAuth } from "./basic-auth.js";
+import { createAuthRouter } from "./auth-routes.js";
 import { createGenerationRouter } from "./generation-route.js";
 import { createRecipeRouter } from "./recipe-routes.js";
+import { createSessionAuth } from "./session-auth.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATABASE_CONNECTION_ERROR_CODES = new Set([
@@ -41,8 +43,15 @@ function logError(error) {
 
 export function createApp({
   repository,
+  authRepository,
   generateRecipe,
   auth,
+  verifier,
+  ownerEmail,
+  googleClientId,
+  secureCookies = true,
+  now,
+  randomToken,
   allowedOrigins = [],
   commit
 } = {}) {
@@ -64,6 +73,7 @@ export function createApp({
     (Array.isArray(allowedOrigins) ? allowedOrigins : [allowedOrigins]).filter(Boolean)
   );
   app.use(cors({
+    credentials: true,
     origin(origin, callback) {
       callback(null, !origin || origins.has(origin));
     }
@@ -73,7 +83,23 @@ export function createApp({
     response.json({ commit: commit || "local" });
   });
 
-  app.use("/api", createBasicAuth(auth));
+  const sessionRepository = authRepository || repository;
+  if (verifier && sessionRepository && ownerEmail) {
+    app.use("/api", createAuthRouter({
+      verifier,
+      repository: sessionRepository,
+      ownerEmail,
+      googleClientId,
+      secureCookies,
+      now,
+      randomToken
+    }));
+    app.use("/api", createSessionAuth({ repository: sessionRepository, ownerEmail, now }));
+  } else if (auth) {
+    // Kept as a compatibility seam for the Part A test harness until the
+    // remaining server tests are converted to session cookies.
+    app.use("/api", createBasicAuth(auth));
+  }
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true });

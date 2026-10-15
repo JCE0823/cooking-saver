@@ -1,8 +1,10 @@
 import "dotenv/config";
 import { createApp } from "./app.js";
 import { createRecipeRepository } from "./recipe-repository.js";
+import { createUserSessionRepository } from "./user-session-repository.js";
 import { migrateDatabase, openDatabase, seedStarterRecipes } from "./db.js";
 import { loadConfig } from "./config.js";
+import { createGoogleVerifier } from "./google-verifier.js";
 
 function safeError(error) {
   return { name: error?.name, code: error?.code, stack: error?.stack };
@@ -32,9 +34,14 @@ async function start() {
     await migrateDatabase(pool);
     await seedStarterRecipes(pool);
     const repository = createRecipeRepository(pool);
+    const authRepository = createUserSessionRepository(pool);
     const app = createApp({
       repository,
-      auth: { username: config.username, password: config.password },
+      authRepository,
+      verifier: createGoogleVerifier({ clientId: config.googleClientId }),
+      ownerEmail: config.ownerEmail,
+      googleClientId: config.googleClientId,
+      secureCookies: config.secureCookies,
       allowedOrigins: config.allowedOrigins,
       commit: config.commit
     });

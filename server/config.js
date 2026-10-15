@@ -11,8 +11,8 @@ function required(env, name, missing) {
 export function loadConfig(env = process.env) {
   const missing = [];
   const databaseUrl = required(env, "DATABASE_URL", missing);
-  const username = required(env, "BASIC_AUTH_USERNAME", missing);
-  const password = required(env, "BASIC_AUTH_PASSWORD", missing);
+  const googleClientId = required(env, "GOOGLE_CLIENT_ID", missing);
+  const ownerEmail = required(env, "OWNER_EMAIL", missing);
   const frontendOrigin = required(env, "FRONTEND_ORIGIN", missing);
 
   if (missing.length > 0) {
@@ -35,9 +35,10 @@ export function loadConfig(env = process.env) {
 
   return {
     databaseUrl: databaseUrl.trim(),
-    username,
-    password,
+    googleClientId: googleClientId.trim(),
+    ownerEmail: ownerEmail.trim().toLowerCase(),
     allowedOrigins,
+    secureCookies: env.NODE_ENV !== "development",
     commit: env.RENDER_GIT_COMMIT?.trim() || "local",
     port
   };

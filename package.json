@@ -12,6 +12,7 @@
     "cors": "^2.8.6",
     "dotenv": "latest",
     "express": "latest",
+    "google-auth-library": "^11.3.0",
     "openai": "latest",
     "pg": "^8.23.1",
     "react": "latest",
