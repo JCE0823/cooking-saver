@@ -4,7 +4,9 @@ import { parse } from "yaml";
 
 const renderConfig = parse(await readFile(new URL("../render.yaml", import.meta.url), "utf8"));
 const deployGuide = await readFile(new URL("../DEPLOY.md", import.meta.url), "utf8");
+const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
 const normalizedDeployGuide = deployGuide.replaceAll("\r\n", "\n");
+const normalizedReadme = readme.replaceAll("\r\n", "\n");
 
 describe("deployment configuration", () => {
   it("defines the app and API services with checks-pass deploys", () => {
@@ -45,5 +47,10 @@ describe("deployment configuration", () => {
     ].join("\n"))).toBe(true);
     expect(deployGuide).toContain("Neon");
     expect(deployGuide).toContain("proxy forwards requests to `http://localhost:3000`");
+  });
+
+  it("documents development cookies for local HTTP", () => {
+    expect(normalizedDeployGuide).toContain("NODE_ENV=development");
+    expect(normalizedReadme).toContain("NODE_ENV=development");
   });
 });

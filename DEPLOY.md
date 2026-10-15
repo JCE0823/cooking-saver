@@ -29,8 +29,10 @@ variables or AI credentials belong in the Blueprint.
 ## Local development
 
 Keep local values in an ignored `.env` file. Configure `DATABASE_URL`, `GOOGLE_CLIENT_ID`,
-`OWNER_EMAIL`, and `FRONTEND_ORIGIN` (use the local Node origin), with optional `PORT` and
-`RENDER_GIT_COMMIT`.
+`OWNER_EMAIL`, and `FRONTEND_ORIGIN` (use the local Node origin), and add
+`NODE_ENV=development`, with optional `PORT` and `RENDER_GIT_COMMIT`. This dotenv setting is
+Windows-friendly and makes the session cookie usable over local HTTP; production keeps the
+default secure-cookie behavior by omitting it.
 
 Run the full local stack from two terminals:
 
