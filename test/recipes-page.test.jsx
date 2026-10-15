@@ -37,6 +37,19 @@ describe("RecipesPage", () => {
     expect(screen.getByText(/viewed 3 times/i)).toBeVisible();
   });
 
+  it("keeps card action text short while naming the recipe for assistive technology", async () => {
+    vi.spyOn(api, "listRecipes").mockResolvedValue([
+      { ...summary, name: "Chocolate Chip Cookies" }
+    ]);
+
+    render(<RecipesPage />);
+
+    const edit = await screen.findByRole("button", { name: "Edit Chocolate Chip Cookies" });
+    const remove = screen.getByRole("button", { name: "Delete Chocolate Chip Cookies" });
+    expect(edit).toHaveTextContent(/^Edit$/);
+    expect(remove).toHaveTextContent(/^Delete$/);
+  });
+
   it("edits a saved recipe", async () => {
     vi.spyOn(api, "listRecipes").mockResolvedValue([summary]);
     vi.spyOn(api, "getRecipe").mockResolvedValue(recipe);

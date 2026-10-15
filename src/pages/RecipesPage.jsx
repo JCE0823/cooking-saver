@@ -196,11 +196,19 @@ export function RecipesPage() {
                 <p>
                   Viewed {recipe.viewCount ?? 0} time{(recipe.viewCount ?? 0) === 1 ? "" : "s"}
                 </p>
-                <button type="button" onClick={() => beginEdit(recipe)}>
-                  Edit {recipe.name}
+                <button
+                  type="button"
+                  aria-label={`Edit ${recipe.name}`}
+                  onClick={() => beginEdit(recipe)}
+                >
+                  Edit
                 </button>
-                <button type="button" onClick={() => beginDelete(recipe)}>
-                  Delete {recipe.name}
+                <button
+                  type="button"
+                  aria-label={`Delete ${recipe.name}`}
+                  onClick={() => beginDelete(recipe)}
+                >
+                  Delete
                 </button>
               </article>
             </li>
