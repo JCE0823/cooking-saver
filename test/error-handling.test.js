@@ -1,16 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../server/app.js";
-
-const auth = { username: "student", password: "correct horse battery staple" };
+import { createSessionAuthFixture, withSession } from "./session-auth-fixture.js";
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("API error handling", () => {
   it("returns JSON for malformed request bodies", async () => {
-    const response = await request(createApp({ auth }))
-      .post("/api/generate")
-      .auth(auth.username, auth.password)
+    const response = await withSession(request(createApp({
+      authRepository: createSessionAuthFixture().authRepository
+    })).post("/api/generate"))
       .set("Content-Type", "application/json")
       .send('{"dishName":');
 
@@ -25,9 +24,10 @@ describe("API error handling", () => {
       getByIdAndRecordView: vi.fn().mockRejectedValue(databaseError)
     };
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fixture = createSessionAuthFixture();
 
-    const response = await request(createApp({ repository, auth })).get("/api/recipes/1")
-      .auth(auth.username, auth.password);
+    const response = await withSession(request(createApp({ repository, authRepository: fixture.authRepository }))
+      .get("/api/recipes/1"));
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: "internal_server_error" });
@@ -51,9 +51,10 @@ describe("API error handling", () => {
       getByIdAndRecordView: vi.fn().mockRejectedValue(databaseError)
     };
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fixture = createSessionAuthFixture();
 
-    const response = await request(createApp({ repository, auth })).get("/api/recipes/1")
-      .auth(auth.username, auth.password);
+    const response = await withSession(request(createApp({ repository, authRepository: fixture.authRepository }))
+      .get("/api/recipes/1"));
 
     expect(response.status).toBe(503);
     expect(response.body).toEqual({ error: "database_unavailable" });

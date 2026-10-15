@@ -2,33 +2,27 @@ import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../server/app.js";
 import { loadConfig } from "../server/config.js";
-
-const credentials = {
-  username: "student",
-  password: "correct horse battery staple"
-};
+import { createSessionAuthFixture, withSession } from "./session-auth-fixture.js";
 
 function createTestApp() {
+  const fixture = createSessionAuthFixture();
   return createApp({
-    auth: credentials,
     allowedOrigins: ["https://frontend.example", "http://localhost:5173"],
     commit: "abc123",
-    repository: { list: vi.fn().mockResolvedValue([]) }
+    repository: { list: vi.fn().mockResolvedValue([]) },
+    authRepository: fixture.authRepository
   });
 }
 
 describe("API authentication and deployment metadata", () => {
-  it("protects API routes with shared Basic Auth", async () => {
+  it("protects API routes with session authentication", async () => {
     const app = createTestApp();
 
     await request(app)
       .get("/api/recipes")
-      .expect("WWW-Authenticate", 'Basic realm="Cooking Saver"')
       .expect(401, { error: "authentication_required" });
 
-    await request(app)
-      .get("/api/recipes")
-      .auth(credentials.username, credentials.password)
+    await withSession(request(app).get("/api/recipes"))
       .expect(200, []);
   });
 
@@ -36,18 +30,16 @@ describe("API authentication and deployment metadata", () => {
     "Basic not-base64",
     "Bearer token",
     "Basic "
-  ])("rejects malformed authorization %s", async (authorization) => {
+  ])("does not accept Authorization credentials %s", async (authorization) => {
     await request(createTestApp())
       .get("/api/recipes")
       .set("Authorization", authorization)
-      .expect("WWW-Authenticate", 'Basic realm="Cooking Saver"')
       .expect(401, { error: "authentication_required" });
   });
 
-  it("rejects wrong credentials", async () => {
+  it("rejects requests without a valid session cookie", async () => {
     await request(createTestApp())
       .get("/api/recipes")
-      .auth(credentials.username, "wrong password")
       .expect(401, { error: "authentication_required" });
   });
 
@@ -61,9 +53,7 @@ describe("API authentication and deployment metadata", () => {
   it("logs request metadata without authorization or credential values", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await request(createTestApp())
-      .get("/api/recipes")
-      .auth(credentials.username, credentials.password)
+    await withSession(request(createTestApp()).get("/api/recipes"))
       .expect(200);
 
     expect(log).toHaveBeenCalledOnce();
@@ -74,8 +64,7 @@ describe("API authentication and deployment metadata", () => {
       status: 200,
       durationMs: expect.any(Number)
     });
-    expect(JSON.stringify(entry)).not.toContain(credentials.username);
-    expect(JSON.stringify(entry)).not.toContain(credentials.password);
+    expect(JSON.stringify(entry)).not.toContain("test-session-token");
     expect(JSON.stringify(entry)).not.toMatch(/authorization/i);
     log.mockRestore();
   });

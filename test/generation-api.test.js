@@ -4,6 +4,7 @@ import { createApp } from "../server/app.js";
 import { migrateDatabase } from "../server/db.js";
 import { createRecipeRepository } from "../server/recipe-repository.js";
 import { createTestPool } from "./postgres.js";
+import { createSessionAuthFixture, withSession } from "./session-auth-fixture.js";
 
 const validRecipe = {
   name: "Lentil Stew",
@@ -15,8 +16,6 @@ const validRecipe = {
   ingredients: [{ quantity: "1 cup", name: "brown lentils" }],
   instructions: ["Simmer the lentils until tender."]
 };
-const auth = { username: "student", password: "correct horse battery staple" };
-
 let pool;
 
 afterEach(async () => {
@@ -26,7 +25,11 @@ afterEach(async () => {
 async function createTestApp(options = {}) {
   pool = createTestPool();
   await migrateDatabase(pool);
-  return createApp({ repository: createRecipeRepository(pool), auth, ...options });
+  return createApp({
+    repository: createRecipeRepository(pool),
+    authRepository: createSessionAuthFixture().authRepository,
+    ...options
+  });
 }
 
 describe("recipe generation API", () => {
@@ -38,9 +41,7 @@ describe("recipe generation API", () => {
     });
     const app = await createTestApp({ generateRecipe });
 
-    const response = await request(app)
-      .post("/api/generate")
-      .auth(auth.username, auth.password)
+    const response = await withSession(request(app).post("/api/generate"))
       .send({ dishName: "Ethiopian lentil stew" })
       .expect(200);
 
@@ -56,9 +57,7 @@ describe("recipe generation API", () => {
     const generateRecipe = vi.fn().mockRejectedValue(new Error("timeout"));
     const app = await createTestApp({ generateRecipe });
 
-    const response = await request(app)
-      .post("/api/generate")
-      .auth(auth.username, auth.password)
+    const response = await withSession(request(app).post("/api/generate"))
       .send({ dishName: "Soup" })
       .expect(502);
 
@@ -68,9 +67,7 @@ describe("recipe generation API", () => {
   it("reports unavailable generation when no generator is configured", async () => {
     const app = await createTestApp();
 
-    await request(app)
-      .post("/api/generate")
-      .auth(auth.username, auth.password)
+    await withSession(request(app).post("/api/generate"))
       .send({ dishName: "Soup" })
       .expect(503, { error: "generation_unavailable" });
   });
@@ -79,9 +76,9 @@ describe("recipe generation API", () => {
     const generateRecipe = vi.fn().mockResolvedValue(validRecipe);
     const app = await createTestApp({ generateRecipe });
 
-    await request(app).post("/api/generate").auth(auth.username, auth.password)
+    await withSession(request(app).post("/api/generate"))
       .send({ dishName: "   " }).expect(400);
-    await request(app).post("/api/generate").auth(auth.username, auth.password)
+    await withSession(request(app).post("/api/generate"))
       .send({ dishName: "x".repeat(101) }).expect(400);
     expect(generateRecipe).not.toHaveBeenCalled();
   });
@@ -90,7 +87,7 @@ describe("recipe generation API", () => {
     const generateRecipe = vi.fn().mockResolvedValue({ ...validRecipe, ingredients: [] });
     const app = await createTestApp({ generateRecipe });
 
-    await request(app).post("/api/generate").auth(auth.username, auth.password)
+    await withSession(request(app).post("/api/generate"))
       .send({ dishName: "Soup" }).expect(502, {
       error: "generation_failed"
     });
