@@ -3,6 +3,7 @@ import { execPath } from "node:process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { createTestPool } from "./postgres.js";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 const serverEntryPoint = join(projectRoot, "server", "index.js");
@@ -118,6 +119,10 @@ describe("server restart persistence", () => {
 
   afterAll(async () => {
     if (server) await stopServer(server.child);
+    if (databaseUrl) {
+      const cleanupPool = createTestPool();
+      await cleanupPool.end();
+    }
   });
 
   it.skipIf(!databaseUrl)("keeps recipe data and app-recorded views after a server restart", async () => {
