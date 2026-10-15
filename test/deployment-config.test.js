@@ -54,7 +54,11 @@ describe("deployment configuration", () => {
     expect(normalizedDeployGuide).toContain("http://localhost:5173");
     expect(normalizedDeployGuide).toContain("authorized JavaScript origins");
     expect(normalizedDeployGuide).toContain("browser frontend origin");
-    expect(normalizedDeployGuide).toContain("last known-good Part A");
+    expect(normalizedDeployGuide).toContain("no verified Google-session");
+    expect(normalizedDeployGuide).toContain("Basic Auth commit");
+    expect(normalizedDeployGuide).toContain("previously verified Part B Google-auth/full-stack");
+    expect(normalizedDeployGuide).toContain("never an authentication rollback target");
+    expect(normalizedDeployGuide).not.toContain("Part A deployment/commit");
     expect(normalizedDeployGuide).not.toContain("static service available while investigating");
   });
 });

@@ -2,7 +2,8 @@
 
 ## Status
 
-Implemented and committed as `5701b07` (`fix: close final Part B review findings`). No external
+Implemented and committed as `5701b07` (`fix: close final Part B review findings`), with a follow-up
+documentation correction for rollback guidance. No external
 deployment, push, credential, or environment changes were made.
 
 ## Findings addressed
@@ -10,8 +11,10 @@ deployment, push, credential, or environment changes were made.
 - CI now builds `dist` before the PostgreSQL-backed test run, so restart-persistence SPA assertions
   are deterministic in a fresh checkout.
 - The Render static service remains in `render.yaml`, but deployment documentation now explicitly
-  treats it as retained legacy infrastructure rather than a functional rollback. Rollback is a
-  redeploy of the last known-good Part A full-stack Node deployment/commit.
+  treats it as retained legacy infrastructure rather than a functional or authentication rollback.
+  Before the first verified Part B deployment there is no verified Google-session rollback target;
+  after verification, rollback is only to a previously verified Part B Google-auth/full-stack
+  deployment or commit using Render rollback/redeploy.
 - `copyShared` locks the shared parent row with `FOR SHARE` for the transaction's scalar and child
   snapshot. A real-Postgres-only concurrency test verifies an update cannot interleave with the
   copy; the copied recipe remains internally consistent.

@@ -45,9 +45,9 @@ Run the full local stack from two terminals:
 
 ## Rollback
 
-If the full-stack service fails production verification, redeploy the last known-good Part A
-deployment/commit of the full-stack Node service in Render. That is the supported rollback because
-it restores the previously verified application and API together. The static service is retained
-legacy infrastructure until production verification is complete; it auto-deploys the current
-repository source and therefore is not a safe application rollback target. Do not delete the
-database or rotate credentials as part of a routine rollback.
+Before the first verified Part B production deployment, there is no verified Google-session
+rollback target. Do not treat the retained static service or any Basic Auth commit as a safe
+authentication rollback. After Part B has been verified, use Render rollback/redeploy only to a
+previously verified Part B Google-auth/full-stack deployment or commit. The static service remains
+legacy infrastructure and is never an authentication rollback target. Do not delete the database
+or rotate credentials as part of a routine rollback.
