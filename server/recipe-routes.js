@@ -39,9 +39,12 @@ function parseRecipeBody(request, response) {
 export function createRecipeRouter({ repository }) {
   const router = express.Router();
 
-  router.get("/", async (_request, response, next) => {
+  router.get("/", async (request, response, next) => {
     try {
-      response.json(await repository.list());
+      const recipes = repository.listPersonal
+        ? await repository.listPersonal(request.user.id)
+        : await repository.list();
+      response.json(recipes);
     } catch (error) {
       next(error);
     }
@@ -49,7 +52,7 @@ export function createRecipeRouter({ repository }) {
 
   router.get("/search", async (request, response, next) => {
     try {
-      response.json(await repository.search(request.query.q));
+      response.json(await repository.searchVisible(request.user.id, request.query.q));
     } catch (error) {
       next(error);
     }
@@ -59,7 +62,9 @@ export function createRecipeRouter({ repository }) {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
     try {
-      const recipe = await repository.getByIdAndRecordView(id);
+      const getVisibleRecipe = repository.getVisibleByIdAndRecordView
+        ?? repository.getByIdAndRecordView;
+      const recipe = await getVisibleRecipe(id, request.user.id);
       if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
       return response.json(recipe);
     } catch (error) {
@@ -71,9 +76,21 @@ export function createRecipeRouter({ repository }) {
     const input = parseRecipeBody(request, response);
     if (!input) return;
     try {
-      response.status(201).json(await repository.create(input));
+      response.status(201).json(await repository.createPersonal(request.user.id, input));
     } catch (error) {
       next(error);
+    }
+  });
+
+  router.post("/:id/copy", async (request, response, next) => {
+    const id = parseId(request.params.id);
+    if (id === null) return sendInvalidId(response);
+    try {
+      const recipe = await repository.copyShared(id, request.user.id);
+      if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
+      return response.status(201).json(recipe);
+    } catch (error) {
+      return next(error);
     }
   });
 
@@ -83,7 +100,7 @@ export function createRecipeRouter({ repository }) {
     const input = parseRecipeBody(request, response);
     if (!input) return;
     try {
-      const recipe = await repository.update(id, input);
+      const recipe = await repository.updatePersonal(id, request.user.id, input);
       if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
       return response.json(recipe);
     } catch (error) {
@@ -95,7 +112,7 @@ export function createRecipeRouter({ repository }) {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
     try {
-      if (!(await repository.remove(id))) {
+      if (!(await repository.removePersonal(id, request.user.id))) {
         return response.status(404).json({ error: "recipe_not_found" });
       }
       return response.status(204).send();

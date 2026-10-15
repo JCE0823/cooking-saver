@@ -4,7 +4,7 @@ import { createApp } from "../server/app.js";
 import { migrateDatabase } from "../server/db.js";
 import { createRecipeRepository } from "../server/recipe-repository.js";
 import { createTestPool } from "./postgres.js";
-import { createSessionAuthFixture, withSession } from "./session-auth-fixture.js";
+import { createSessionAuthFixture, seedTestUser, withSession } from "./session-auth-fixture.js";
 
 const validRecipe = {
   name: "Tomato Soup",
@@ -32,9 +32,11 @@ describe("recipe search and views", () => {
   it("searches by partial name without case sensitivity", async () => {
     pool = createTestPool();
     await migrateDatabase(pool);
+    const fixture = createSessionAuthFixture();
+    await seedTestUser(pool, fixture.user);
     const app = createApp({
       repository: createRecipeRepository(pool),
-      authRepository: createSessionAuthFixture().authRepository
+      authRepository: fixture.authRepository
     });
     await createRecipe(app, { ...validRecipe, name: "Chicken Alfredo" });
     await createRecipe(app, { ...validRecipe, name: "Chicken Curry" });
@@ -51,9 +53,11 @@ describe("recipe search and views", () => {
   it("increments only when a full recipe is opened", async () => {
     pool = createTestPool();
     await migrateDatabase(pool);
+    const fixture = createSessionAuthFixture();
+    await seedTestUser(pool, fixture.user);
     const app = createApp({
       repository: createRecipeRepository(pool),
-      authRepository: createSessionAuthFixture().authRepository
+      authRepository: fixture.authRepository
     });
     const created = await createRecipe(app, validRecipe);
 
@@ -70,9 +74,11 @@ describe("recipe search and views", () => {
   it("treats LIKE wildcard characters in the query as literals", async () => {
     pool = createTestPool();
     await migrateDatabase(pool);
+    const fixture = createSessionAuthFixture();
+    await seedTestUser(pool, fixture.user);
     const app = createApp({
       repository: createRecipeRepository(pool),
-      authRepository: createSessionAuthFixture().authRepository
+      authRepository: fixture.authRepository
     });
     await createRecipe(app, { ...validRecipe, name: "A% Soup" });
     await createRecipe(app, { ...validRecipe, name: "AB Soup" });

@@ -14,6 +14,7 @@ function mapRecipe(row, ingredients, instructions) {
     servings: row.servings,
     notes: row.notes ?? "",
     source: row.source,
+    scope: row.owner_user_id === null ? "shared" : "personal",
     viewCount: row.view_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -33,6 +34,7 @@ function mapSearchResult(row) {
     cookMinutes: row.cook_minutes,
     servings: row.servings,
     source: row.source,
+    scope: row.owner_user_id === null ? "shared" : "personal",
     viewCount: row.view_count
   };
 }
@@ -97,57 +99,176 @@ async function getRecipe(client, id) {
 }
 
 export function createRecipeRepository(pool) {
-  async function getById(id) {
-    return getRecipe(pool, id);
-  }
-
-  async function list() {
-    const result = await pool.query("SELECT * FROM recipes ORDER BY id");
+  async function listPersonal(userId) {
+    const result = await pool.query(
+      "SELECT * FROM recipes WHERE owner_user_id = $1 ORDER BY id",
+      [userId]
+    );
     return Promise.all(result.rows.map((row) => getRecipe(pool, row.id)));
   }
 
-  async function search(query) {
+  async function listShared() {
+    const result = await pool.query(
+      "SELECT * FROM recipes WHERE owner_user_id IS NULL ORDER BY id"
+    );
+    return Promise.all(result.rows.map((row) => getRecipe(pool, row.id)));
+  }
+
+  async function searchVisible(userId, query) {
     const rawQuery = String(query ?? "");
     const escapedQuery = escapeLikePattern(rawQuery);
     try {
       const result = await pool.query(
-        `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count
+        `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count, owner_user_id
          FROM recipes
-         WHERE name ILIKE $1 ESCAPE '\\'
+         WHERE name ILIKE $2 ESCAPE '\\'
+           AND (owner_user_id IS NULL OR owner_user_id = $1)
          ORDER BY LOWER(name), id`,
-        [`%${escapedQuery}%`]
+        [userId, `%${escapedQuery}%`]
       );
       return result.rows.map(mapSearchResult);
     } catch (error) {
       if (pool.__cookingSaverTestAdapter !== "pg-mem") throw error;
 
       const result = await pool.query(
-        `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count
+        `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count, owner_user_id
          FROM recipes
          ORDER BY LOWER(name), id`
       );
       const pattern = escapedLikeRegExp(`%${escapedQuery}%`);
-      return result.rows.filter((row) => pattern.test(row.name)).map(mapSearchResult);
+      return result.rows
+        .filter((row) => (row.owner_user_id === null || String(row.owner_user_id) === String(userId))
+          && pattern.test(row.name))
+        .map(mapSearchResult);
     }
   }
 
-  async function getByIdAndRecordView(id) {
+  async function getVisibleByIdAndRecordView(id, userId) {
     return withTransaction(pool, async (client) => {
       const result = await client.query(
-        "UPDATE recipes SET view_count = view_count + 1 WHERE id = $1 RETURNING *",
-        [id]
+        `UPDATE recipes
+         SET view_count = view_count + 1
+         WHERE id = $1 AND (owner_user_id IS NULL OR owner_user_id = $2)
+         RETURNING *`,
+        [id, userId]
       );
       if (result.rows.length === 0) return null;
       return getRecipe(client, id);
     });
   }
 
-  async function create(input) {
+  async function createPersonal(userId, input) {
     return withTransaction(pool, async (client) => {
       const result = await client.query(
         `INSERT INTO recipes
-          (name, prep_minutes, cook_minutes, servings, notes, source)
-         VALUES ($1, $2, $3, $4, $5, $6)
+          (name, prep_minutes, cook_minutes, servings, notes, source, owner_user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [
+          input.name,
+          input.prepMinutes,
+          input.cookMinutes,
+          input.servings,
+          input.notes,
+          input.source,
+          userId
+        ]
+      );
+      const recipeId = result.rows[0].id;
+      await insertChildren(client, recipeId, input);
+      return getRecipe(client, recipeId);
+    });
+  }
+
+  async function copyShared(id, userId) {
+    return withTransaction(pool, async (client) => {
+      const parentResult = await client.query(
+        "SELECT * FROM recipes WHERE id = $1 AND owner_user_id IS NULL",
+        [id]
+      );
+      const parent = parentResult.rows[0];
+      if (!parent) return null;
+
+      const result = await client.query(
+        `INSERT INTO recipes
+          (name, prep_minutes, cook_minutes, servings, notes, source, owner_user_id)
+         VALUES ($1, $2, $3, $4, $5, 'manual', $6)
+         RETURNING id`,
+        [
+          parent.name,
+          parent.prep_minutes,
+          parent.cook_minutes,
+          parent.servings,
+          parent.notes,
+          userId
+        ]
+      );
+      const recipeId = result.rows[0].id;
+      const [ingredients, instructions] = await Promise.all([
+        client.query(
+          "SELECT quantity, name FROM ingredients WHERE recipe_id = $1 ORDER BY position",
+          [id]
+        ),
+        client.query(
+          "SELECT text FROM instructions WHERE recipe_id = $1 ORDER BY position",
+          [id]
+        )
+      ]);
+      await insertChildren(client, recipeId, {
+        ingredients: ingredients.rows,
+        instructions: instructions.rows.map((instruction) => instruction.text)
+      });
+      return getRecipe(client, recipeId);
+    });
+  }
+
+  async function updatePersonal(id, userId, input) {
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        `UPDATE recipes
+         SET name = $3,
+             prep_minutes = $4,
+             cook_minutes = $5,
+             servings = $6,
+             notes = $7,
+             source = $8,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND owner_user_id = $2
+         RETURNING id`,
+        [
+          id,
+          userId,
+          input.name,
+          input.prepMinutes,
+          input.cookMinutes,
+          input.servings,
+          input.notes,
+          input.source
+        ]
+      );
+      if (result.rows.length === 0) return null;
+
+      await client.query("DELETE FROM ingredients WHERE recipe_id = $1", [id]);
+      await client.query("DELETE FROM instructions WHERE recipe_id = $1", [id]);
+      await insertChildren(client, id, input);
+      return getRecipe(client, id);
+    });
+  }
+
+  async function removePersonal(id, userId) {
+    const result = await pool.query(
+      "DELETE FROM recipes WHERE id = $1 AND owner_user_id = $2 RETURNING id",
+      [id, userId]
+    );
+    return result.rows.length > 0;
+  }
+
+  async function createShared(input) {
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        `INSERT INTO recipes
+          (name, prep_minutes, cook_minutes, servings, notes, source, owner_user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, NULL)
          RETURNING id`,
         [
           input.name,
@@ -164,27 +285,27 @@ export function createRecipeRepository(pool) {
     });
   }
 
-  async function update(id, input) {
+  async function updateShared(id, input) {
     return withTransaction(pool, async (client) => {
       const result = await client.query(
         `UPDATE recipes
-         SET name = $1,
-             prep_minutes = $2,
-             cook_minutes = $3,
-             servings = $4,
-             notes = $5,
-             source = $6,
+         SET name = $2,
+             prep_minutes = $3,
+             cook_minutes = $4,
+             servings = $5,
+             notes = $6,
+             source = $7,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $7
+         WHERE id = $1 AND owner_user_id IS NULL
          RETURNING id`,
         [
+          id,
           input.name,
           input.prepMinutes,
           input.cookMinutes,
           input.servings,
           input.notes,
-          input.source,
-          id
+          input.source
         ]
       );
       if (result.rows.length === 0) return null;
@@ -196,12 +317,27 @@ export function createRecipeRepository(pool) {
     });
   }
 
-  async function remove(id) {
-    const result = await pool.query("DELETE FROM recipes WHERE id = $1 RETURNING id", [id]);
+  async function removeShared(id) {
+    const result = await pool.query(
+      "DELETE FROM recipes WHERE id = $1 AND owner_user_id IS NULL RETURNING id",
+      [id]
+    );
     return result.rows.length > 0;
   }
 
-  return { list, getById, getByIdAndRecordView, search, create, update, remove };
+  return {
+    listPersonal,
+    listShared,
+    searchVisible,
+    getVisibleByIdAndRecordView,
+    createPersonal,
+    copyShared,
+    updatePersonal,
+    removePersonal,
+    createShared,
+    updateShared,
+    removeShared
+  };
 }
 
 async function insertChildren(client, recipeId, input) {

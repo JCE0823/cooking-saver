@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createAuthRouter } from "./auth-routes.js";
 import { createGenerationRouter } from "./generation-route.js";
 import { createRecipeRouter } from "./recipe-routes.js";
+import { createSharedRecipeRouter } from "./shared-recipe-routes.js";
 import { createSessionAuth } from "./session-auth.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -99,6 +100,7 @@ export function createApp({
 
   if (repository) {
     app.use("/api/recipes", createRecipeRouter({ repository }));
+    app.use("/api/shared-recipes", createSharedRecipeRouter({ repository }));
   }
 
   app.use("/api/generate", createGenerationRouter({ generateRecipe }));

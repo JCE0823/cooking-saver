@@ -4,7 +4,7 @@ import { createApp } from "../server/app.js";
 import { migrateDatabase } from "../server/db.js";
 import { createRecipeRepository } from "../server/recipe-repository.js";
 import { createTestPool } from "./postgres.js";
-import { createSessionAuthFixture, withSession } from "./session-auth-fixture.js";
+import { createSessionAuthFixture, seedTestUser, withSession } from "./session-auth-fixture.js";
 
 const validRecipe = {
   name: "Tomato Soup",
@@ -26,8 +26,10 @@ describe("recipe API", () => {
   it("creates, updates, and deletes a complete recipe", async () => {
     pool = createTestPool();
     await migrateDatabase(pool);
+    const fixture = createSessionAuthFixture();
+    await seedTestUser(pool, fixture.user);
     const repository = createRecipeRepository(pool);
-    const app = createApp({ repository, authRepository: createSessionAuthFixture().authRepository });
+    const app = createApp({ repository, authRepository: fixture.authRepository });
 
     const created = await withSession(request(app).post("/api/recipes"))
       .send(validRecipe).expect(201);
@@ -53,8 +55,10 @@ describe("recipe API", () => {
   it("rejects a recipe without ingredients", async () => {
     pool = createTestPool();
     await migrateDatabase(pool);
+    const fixture = createSessionAuthFixture();
+    await seedTestUser(pool, fixture.user);
     const repository = createRecipeRepository(pool);
-    const app = createApp({ repository, authRepository: createSessionAuthFixture().authRepository });
+    const app = createApp({ repository, authRepository: fixture.authRepository });
 
     const response = await withSession(request(app).post("/api/recipes"))
       .send({ ...validRecipe, ingredients: [] })
@@ -65,8 +69,10 @@ describe("recipe API", () => {
   it("preserves the view count when updating recipe content", async () => {
     pool = createTestPool();
     await migrateDatabase(pool);
+    const fixture = createSessionAuthFixture();
+    await seedTestUser(pool, fixture.user);
     const repository = createRecipeRepository(pool);
-    const app = createApp({ repository, authRepository: createSessionAuthFixture().authRepository });
+    const app = createApp({ repository, authRepository: fixture.authRepository });
 
     const created = await withSession(request(app).post("/api/recipes"))
       .send(validRecipe).expect(201);
