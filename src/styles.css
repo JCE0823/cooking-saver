@@ -114,6 +114,42 @@ main {
   margin-top: 0.4rem;
 }
 
+.google-sign-in {
+  min-height: 2.75rem;
+  margin-top: 1.25rem;
+}
+
+.app-status {
+  width: min(100% - 2rem, 70rem);
+  margin: 2rem auto;
+}
+
+.session-message {
+  width: min(100% - 2rem, 70rem);
+  margin: 1rem auto 0;
+}
+
+.signed-in-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.user-role {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.profile-image {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+}
+
 h1,
 h2,
 h3 {

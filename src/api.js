@@ -1,35 +1,17 @@
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? "")
-  .trim()
-  .replace(/\/+$/, "");
-
-let credentials;
-
-export function setCredentials({ username, password }) {
-  credentials = { username, password };
-}
-
-export function clearCredentials() {
-  credentials = undefined;
-}
-
-function authorizationHeader() {
-  if (!credentials) return undefined;
-  return `Basic ${globalThis.btoa(`${credentials.username}:${credentials.password}`)}`;
-}
-
 async function requestJSON(path, options = {}) {
   const headers = {
     Accept: "application/json",
     ...(options.body ? { "Content-Type": "application/json" } : {}),
     ...options.headers
   };
-  const authorization = authorizationHeader();
-  if (authorization) headers.Authorization = authorization;
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(path, {
     ...options,
+    credentials: "include",
     headers
   });
+
+  if (response.status === 204) return undefined;
 
   const text = await response.text();
   let payload;
@@ -42,6 +24,16 @@ async function requestJSON(path, options = {}) {
   }
 
   if (!response.ok) {
+    const endpoint = path.split("?", 1)[0];
+    if (
+      response.status === 401
+      && endpoint !== "/api/auth/google"
+      && endpoint !== "/api/auth/session"
+    ) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("cooking-saver:unauthorized"));
+      }
+    }
     const code = payload?.error ?? `http_${response.status}`;
     const error = new Error(`Request failed: ${code}`);
     error.code = code;
@@ -61,15 +53,16 @@ export function listRecipes() {
   return requestJSON("/api/recipes");
 }
 
-export async function verifyCredentials(username, password) {
-  setCredentials({ username, password });
-  try {
-    return await listRecipes();
-  } catch (error) {
-    clearCredentials();
-    throw error;
-  }
-}
+export const getPublicConfig = () => requestJSON("/api/config");
+
+export const getSession = () => requestJSON("/api/auth/session");
+
+export const signInWithGoogle = (credential) => requestJSON("/api/auth/google", {
+  method: "POST",
+  body: JSON.stringify({ credential })
+});
+
+export const signOut = () => requestJSON("/api/auth/sign-out", { method: "POST" });
 
 export function getRecipe(id) {
   return requestJSON(`/api/recipes/${encodeURIComponent(id)}`);

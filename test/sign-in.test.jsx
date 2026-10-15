@@ -1,82 +1,64 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { App } from "../src/App.jsx";
-import { clearCredentials, listRecipes } from "../src/api.js";
+import { GoogleSignIn } from "../src/components/GoogleSignIn.jsx";
+import * as api from "../src/api.js";
 
 afterEach(() => {
   cleanup();
-  clearCredentials();
+  delete window.google;
   vi.restoreAllMocks();
 });
 
-describe("sign in", () => {
-  it("verifies credentials against the protected recipes endpoint", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } })
-    );
-    const localStorageSpy = vi.spyOn(window.localStorage, "setItem");
-    const sessionStorageSpy = vi.spyOn(window.sessionStorage, "setItem");
+function installFakeGoogle() {
+  let callback;
+  window.google = {
+    accounts: {
+      id: {
+        initialize: (options) => {
+          callback = options.callback;
+        },
+        renderButton: (container) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "Continue with Google";
+          button.addEventListener("click", () => callback({ credential: "fake-google-credential" }));
+          container.append(button);
+        }
+      }
+    }
+  };
+}
 
-    const user = userEvent.setup();
-    render(<App />);
-    expect(screen.getByRole("heading", { name: /sign in to cooking saver/i })).toBeInTheDocument();
-    await user.type(screen.getByLabelText(/username/i), "student");
-    await user.type(screen.getByLabelText(/password/i), "secret");
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
+describe("Google sign in", () => {
+  it("sends the Google credential to the server without storing it", async () => {
+    installFakeGoogle();
+    const signIn = vi.spyOn(api, "signInWithGoogle").mockResolvedValue({
+      user: {
+        id: 2,
+        email: "user@example.com",
+        displayName: "Normal User",
+        pictureUrl: null,
+        role: "user"
+      }
+    });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/recipes",
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: `Basic ${btoa("student:secret")}` })
-      })
-    );
-    expect(await screen.findByRole("link", { name: /search/i })).toBeInTheDocument();
-    expect(localStorageSpy).not.toHaveBeenCalled();
-    expect(sessionStorageSpy).not.toHaveBeenCalled();
+    render(<GoogleSignIn googleClientId="client-123" onSignedIn={() => {}} />);
+    await userEvent.click(await screen.findByRole("button", { name: /continue with google/i }));
+
+    expect(signIn).toHaveBeenCalledWith("fake-google-credential");
+    expect(window.localStorage).toHaveLength(0);
+    expect(window.sessionStorage).toHaveLength(0);
   });
 
-  it("shows a helpful error for incorrect credentials without using browser storage", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "authentication_required" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      }))
-      .mockResolvedValueOnce(new Response("[]", {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      }));
-    const localStorageSpy = vi.spyOn(window.localStorage, "setItem");
-    const sessionStorageSpy = vi.spyOn(window.sessionStorage, "setItem");
+  it("shows a stable retry message when Google sign in fails", async () => {
+    installFakeGoogle();
+    vi.spyOn(api, "signInWithGoogle").mockRejectedValue(new Error("offline"));
 
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(screen.getByLabelText(/username/i), "student");
-    await user.type(screen.getByLabelText(/password/i), "wrong");
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
+    render(<GoogleSignIn googleClientId="client-123" onSignedIn={() => {}} />);
+    await userEvent.click(await screen.findByRole("button", { name: /continue with google/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/username or password is incorrect/i);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(localStorageSpy).not.toHaveBeenCalled();
-    expect(sessionStorageSpy).not.toHaveBeenCalled();
-
-    await expect(listRecipes()).resolves.toEqual([]);
-    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBeUndefined();
-  });
-
-  it("clears credentials and restores the sign-in gate on Sign Out", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(
-      new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } })
-    ));
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(screen.getByLabelText(/username/i), "student");
-    await user.type(screen.getByLabelText(/password/i), "secret");
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
-    await user.click(await screen.findByRole("button", { name: /sign out/i }));
-
-    expect(screen.getByRole("heading", { name: /sign in to cooking saver/i })).toBeInTheDocument();
-    await listRecipes();
-    expect(fetchMock.mock.calls.at(-1)[1].headers.Authorization).toBeUndefined();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/google sign-in failed/i);
+    expect(screen.getByText(/refresh the page to retry/i)).toBeVisible();
   });
 });
