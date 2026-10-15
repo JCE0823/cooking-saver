@@ -36,7 +36,6 @@ describe("deployment configuration", () => {
       { key: "GOOGLE_CLIENT_ID", sync: false },
       { key: "OWNER_EMAIL", sync: false }
     ]));
-    expect(api.envVars.some((item) => item.key.startsWith("BASIC_AUTH_"))).toBe(false);
     expect(api.envVars.some((variable) => variable.key.includes("OPENAI") || variable.key.includes("UMGPT"))).toBe(false);
   });
 

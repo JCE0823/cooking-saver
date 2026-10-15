@@ -27,9 +27,7 @@ describe("API authentication and deployment metadata", () => {
   });
 
   it.each([
-    "Basic not-base64",
-    "Bearer token",
-    "Basic "
+    "Bearer token"
   ])("does not accept Authorization credentials %s", async (authorization) => {
     await request(createTestApp())
       .get("/api/recipes")

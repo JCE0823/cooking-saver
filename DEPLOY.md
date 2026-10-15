@@ -23,8 +23,8 @@ dashboard without committing their values:
 - `FRONTEND_ORIGIN` — the full-stack app origin shown at the top of this document.
 
 Add the production app origin to the Google OAuth client's authorized JavaScript origins. The
-production app and API use the same origin, so React calls relative `/api` paths. No Basic Auth
-variables or AI credentials belong in the Blueprint.
+production app and API use the same origin, so React calls relative `/api` paths. No AI
+credentials belong in the Blueprint.
 
 ## Local development
 
