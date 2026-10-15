@@ -8,6 +8,13 @@ function quoteIdentifier(identifier) {
 }
 
 export async function resetTestDatabase(pool) {
+  if (pool.__cookingSaverTestAdapter !== "pg-mem") {
+    await pool.query(
+      "TRUNCATE instructions, ingredients, sessions, recipes, users, seed_installations RESTART IDENTITY CASCADE"
+    );
+    return;
+  }
+
   const tables = await pool.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
   );

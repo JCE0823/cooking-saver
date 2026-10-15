@@ -6,12 +6,17 @@ describe("PostgreSQL test isolation", () => {
   it("removes every public table before the database is reused", async () => {
     const database = newDb({ noAstCoverageCheck: true });
     const { Pool } = database.adapters.createPg();
-    const firstPool = resetWhenClosed(new Pool());
+    const firstPool = new Pool();
+    firstPool.__cookingSaverTestAdapter = "pg-mem";
+    resetWhenClosed(firstPool);
     const secondPool = new Pool();
 
     try {
       await firstPool.query("CREATE TABLE contamination_probe (value TEXT)");
       await firstPool.query("INSERT INTO contamination_probe (value) VALUES ('left behind')");
+      await firstPool.query("CREATE TABLE users (id BIGINT PRIMARY KEY)");
+      await firstPool.query("CREATE TABLE sessions (id BIGINT PRIMARY KEY)");
+      await firstPool.query("CREATE TABLE recipes (id BIGINT PRIMARY KEY)");
 
       await firstPool.end();
 

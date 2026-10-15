@@ -39,8 +39,33 @@ describe("PostgreSQL database", () => {
     const migrations = await pool.query("SELECT version FROM schema_migrations ORDER BY version");
     expect(migrations.rows.map((row) => row.version)).toEqual([
       "001-initial-schema.sql",
-      "002-starter-seed-state.sql"
+      "002-starter-seed-state.sql",
+      "003-users-sessions-and-recipe-owners.sql"
     ]);
+  });
+
+  it("migrates existing recipes into the shared collection", async () => {
+    pool = createTestPool();
+    await migrateDatabase(pool);
+    await seedStarterRecipes(pool);
+
+    const users = await pool.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'users' ORDER BY ordinal_position"
+    );
+    const sessions = await pool.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'sessions' ORDER BY ordinal_position"
+    );
+    const recipes = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM recipes WHERE owner_user_id IS NULL"
+    );
+
+    expect(users.rows.map((row) => row.column_name)).toEqual([
+      "id", "google_subject", "email", "display_name", "picture_url", "created_at", "updated_at"
+    ]);
+    expect(sessions.rows.map((row) => row.column_name)).toEqual([
+      "id", "token_hash", "user_id", "expires_at", "revoked_at", "created_at"
+    ]);
+    expect(recipes.rows[0].count).toBe(10);
   });
 
   it("does not restore a deliberately deleted starter after a later seed", async () => {
