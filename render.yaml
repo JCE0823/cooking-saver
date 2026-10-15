@@ -16,16 +16,16 @@ services:
     runtime: node
     name: cooking-saver-api-jce0823
     plan: free
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     autoDeployTrigger: checksPass
     healthCheckPath: /api/version
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: BASIC_AUTH_USERNAME
+      - key: GOOGLE_CLIENT_ID
         sync: false
-      - key: BASIC_AUTH_PASSWORD
+      - key: OWNER_EMAIL
         sync: false
       - key: FRONTEND_ORIGIN
-        value: https://cooking-saver-jce0823.onrender.com
+        value: https://cooking-saver-api-jce0823.onrender.com

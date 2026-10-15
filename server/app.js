@@ -105,9 +105,17 @@ export function createApp({
 
   app.use("/api/generate", createGenerationRouter({ generateRecipe }));
 
+  app.use("/api", (_request, response) => {
+    response.status(404).json({ error: "not_found" });
+  });
+
   const distPath = path.join(projectRoot, "dist");
   if (existsSync(distPath)) {
     app.use(express.static(distPath));
+    app.get("/{*path}", (request, response, next) => {
+      if (request.path.startsWith("/api/")) return next();
+      return response.sendFile(path.join(distPath, "index.html"));
+    });
   }
 
   // Keep parser and unexpected server failures in the JSON API shape. Route

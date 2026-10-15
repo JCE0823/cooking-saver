@@ -22,31 +22,28 @@ describe("deployment configuration", () => {
       { type: "rewrite", source: "/*", destination: "/index.html" }
     ]);
     expect(api.runtime).toBe("node");
-    expect(api.buildCommand).toBe("npm ci");
+    expect(api.buildCommand).toBe("npm ci && npm run build");
     expect(api.startCommand).toBe("npm start");
     expect(api.healthCheckPath).toBe("/api/version");
   });
 
   it("keeps API secrets as host-provided settings", () => {
     const api = renderConfig.services.find((service) => service.name === "cooking-saver-api-jce0823");
-    const vars = Object.fromEntries(api.envVars.map((variable) => [variable.key, variable]));
-    expect(vars.DATABASE_URL).toEqual({ key: "DATABASE_URL", sync: false });
-    expect(vars.BASIC_AUTH_USERNAME).toEqual({ key: "BASIC_AUTH_USERNAME", sync: false });
-    expect(vars.BASIC_AUTH_PASSWORD).toEqual({ key: "BASIC_AUTH_PASSWORD", sync: false });
-    expect(vars.FRONTEND_ORIGIN).toEqual({
-      key: "FRONTEND_ORIGIN",
-      value: "https://cooking-saver-jce0823.onrender.com"
-    });
-    expect(api.envVars.some((variable) => variable.key.includes("AI") || variable.key.includes("OPENAI"))).toBe(false);
+    expect(api.envVars).toEqual(expect.arrayContaining([
+      { key: "DATABASE_URL", sync: false },
+      { key: "GOOGLE_CLIENT_ID", sync: false },
+      { key: "OWNER_EMAIL", sync: false }
+    ]));
+    expect(api.envVars.some((item) => item.key.startsWith("BASIC_AUTH_"))).toBe(false);
+    expect(api.envVars.some((variable) => variable.key.includes("OPENAI") || variable.key.includes("UMGPT"))).toBe(false);
   });
 
   it("starts DEPLOY.md with the fixed PS3 endpoints", () => {
     expect(normalizedDeployGuide.startsWith([
-      "App: https://cooking-saver-jce0823.onrender.com",
-      "API: https://cooking-saver-api-jce0823.onrender.com",
+      "App: https://cooking-saver-api-jce0823.onrender.com",
       "Protected: /api/recipes"
     ].join("\n"))).toBe(true);
     expect(deployGuide).toContain("Neon");
-    expect(deployGuide).toContain("VITE_API_BASE_URL=http://localhost:3000");
+    expect(deployGuide).toContain("proxy forwards requests to `http://localhost:3000`");
   });
 });
