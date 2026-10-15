@@ -39,10 +39,13 @@ describe("API error handling", () => {
     });
   });
 
-  it("reports database connection failures as unavailable", async () => {
-    const databaseError = Object.assign(new Error("private connection details"), {
-      code: "ECONNREFUSED"
-    });
+  it.each([
+    "ECONNREFUSED",
+    "EAI_AGAIN",
+    "EHOSTUNREACH",
+    "ENETUNREACH"
+  ])("reports %s database connection failures as unavailable", async (code) => {
+    const databaseError = Object.assign(new Error("private connection details"), { code });
     const repository = {
       getByIdAndRecordView: vi.fn().mockRejectedValue(databaseError)
     };

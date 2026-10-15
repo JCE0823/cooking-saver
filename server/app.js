@@ -8,11 +8,27 @@ import { createGenerationRouter } from "./generation-route.js";
 import { createRecipeRouter } from "./recipe-routes.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DATABASE_CONNECTION_ERROR_CODES = new Set([
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EAI_AGAIN",
+  "EAI_FAIL",
+  "EAI_NODATA",
+  "EAI_NONAME",
+  "EHOSTDOWN",
+  "EHOSTUNREACH",
+  "ENETDOWN",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "ETIMEDOUT",
+  "57P01"
+]);
 
 function isDatabaseUnavailable(error) {
   const code = typeof error?.code === "string" ? error.code : "";
-  return code.startsWith("08")
-    || ["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "57P01"].includes(code);
+  return code.startsWith("08") || DATABASE_CONNECTION_ERROR_CODES.has(code);
 }
 
 function logError(error) {

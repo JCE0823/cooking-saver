@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 const serverEntryPoint = join(projectRoot, "server", "index.js");
 const auth = { username: "student", password: "correct horse battery staple" };
-const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const validRecipe = {
   name: "Tomato Soup",
   prepMinutes: 10,
