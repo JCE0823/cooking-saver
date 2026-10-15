@@ -58,6 +58,28 @@ describe("API authentication and deployment metadata", () => {
     await request(app).get("/api/health").expect(401);
   });
 
+  it("logs request metadata without authorization or credential values", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await request(createTestApp())
+      .get("/api/recipes")
+      .auth(credentials.username, credentials.password)
+      .expect(200);
+
+    expect(log).toHaveBeenCalledOnce();
+    const entry = log.mock.calls[0][0];
+    expect(entry).toEqual({
+      method: "GET",
+      path: "/api/recipes",
+      status: 200,
+      durationMs: expect.any(Number)
+    });
+    expect(JSON.stringify(entry)).not.toContain(credentials.username);
+    expect(JSON.stringify(entry)).not.toContain(credentials.password);
+    expect(JSON.stringify(entry)).not.toMatch(/authorization/i);
+    log.mockRestore();
+  });
+
   it("allows only configured origins through CORS", async () => {
     const app = createTestApp();
 

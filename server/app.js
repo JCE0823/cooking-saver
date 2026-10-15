@@ -47,6 +47,18 @@ export function createApp({
   commit
 } = {}) {
   const app = express();
+  app.use((request, response, next) => {
+    const startedAt = performance.now();
+    response.on("finish", () => {
+      console.log({
+        method: request.method,
+        path: request.originalUrl.split("?", 1)[0],
+        status: response.statusCode,
+        durationMs: Math.round((performance.now() - startedAt) * 10) / 10
+      });
+    });
+    next();
+  });
   app.use(express.json());
   const origins = new Set(
     (Array.isArray(allowedOrigins) ? allowedOrigins : [allowedOrigins]).filter(Boolean)
