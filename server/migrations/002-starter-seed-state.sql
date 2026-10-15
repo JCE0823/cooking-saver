@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS seed_installations (
+  seed_name TEXT PRIMARY KEY,
+  installed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
