@@ -10,5 +10,7 @@ export function createTestPool() {
 
   const database = newDb({ noAstCoverageCheck: true });
   const { Pool: MemoryPool } = database.adapters.createPg();
-  return new MemoryPool();
+  const pool = new MemoryPool();
+  pool.__cookingSaverTestAdapter = "pg-mem";
+  return pool;
 }

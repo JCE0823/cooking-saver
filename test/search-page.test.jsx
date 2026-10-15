@@ -50,4 +50,29 @@ describe("SearchPage", () => {
     expect(await screen.findByRole("heading", { name: "Chicken Curry" })).toBeVisible();
     expect(screen.getByText(/viewed 1 time/i)).toBeVisible();
   });
+
+  it("does not let an older search overwrite a newer result", async () => {
+    let resolveFirst;
+    const search = vi.spyOn(api, "searchRecipes").mockImplementationOnce(
+      () => new Promise((resolve) => { resolveFirst = resolve; })
+    ).mockResolvedValueOnce([
+      { id: 2, name: "Newer Soup" },
+      { id: 3, name: "Newer Stew" }
+    ]);
+
+    render(<SearchPage />);
+    const query = screen.getByLabelText(/dish name/i);
+    await userEvent.type(query, "old");
+    await userEvent.click(screen.getByRole("button", { name: /search/i }));
+    await userEvent.clear(query);
+    await userEvent.type(query, "new");
+    await userEvent.click(screen.getByRole("button", { name: /search/i }));
+
+    expect(await screen.findByRole("button", { name: "Newer Soup" })).toBeVisible();
+    resolveFirst([{ id: 1, name: "Older Soup" }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole("button", { name: "Older Soup" })).not.toBeInTheDocument();
+    expect(search).toHaveBeenCalledTimes(2);
+  });
 });

@@ -32,6 +32,25 @@ describe("API authentication and deployment metadata", () => {
       .expect(200, []);
   });
 
+  it.each([
+    "Basic not-base64",
+    "Bearer token",
+    "Basic "
+  ])("rejects malformed authorization %s", async (authorization) => {
+    await request(createTestApp())
+      .get("/api/recipes")
+      .set("Authorization", authorization)
+      .expect("WWW-Authenticate", 'Basic realm="Cooking Saver"')
+      .expect(401, { error: "authentication_required" });
+  });
+
+  it("rejects wrong credentials", async () => {
+    await request(createTestApp())
+      .get("/api/recipes")
+      .auth(credentials.username, "wrong password")
+      .expect(401, { error: "authentication_required" });
+  });
+
   it("leaves version public while protecting health", async () => {
     const app = createTestApp();
 
@@ -79,5 +98,12 @@ describe("API authentication and deployment metadata", () => {
       commit: "abc123",
       port: 4312
     });
+
+    expect(() => loadConfig({
+      DATABASE_URL: "postgres://private",
+      BASIC_AUTH_USERNAME: credentials.username,
+      BASIC_AUTH_PASSWORD: credentials.password,
+      FRONTEND_ORIGIN: " , "
+    })).toThrow("FRONTEND_ORIGIN must contain at least one origin");
   });
 });

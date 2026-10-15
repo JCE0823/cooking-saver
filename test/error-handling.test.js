@@ -43,7 +43,8 @@ describe("API error handling", () => {
     "ECONNREFUSED",
     "EAI_AGAIN",
     "EHOSTUNREACH",
-    "ENETUNREACH"
+    "ENETUNREACH",
+    "ETIMEDOUT"
   ])("reports %s database connection failures as unavailable", async (code) => {
     const databaseError = Object.assign(new Error("private connection details"), { code });
     const repository = {

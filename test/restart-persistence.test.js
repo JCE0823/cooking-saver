@@ -136,4 +136,19 @@ describe("server restart persistence", () => {
 
     await request(server.url, `/api/recipes/${created.id}`, "DELETE");
   });
+
+  it.skipIf(!databaseUrl)("keeps a deleted starter recipe deleted after a restart", async () => {
+    server = await startServer(databaseUrl);
+
+    const before = await getJson(server.url, "/api/recipes");
+    const pancakes = before.find((recipe) => recipe.name === "Pancakes");
+    expect(pancakes).toBeDefined();
+    await request(server.url, `/api/recipes/${pancakes.id}`, "DELETE");
+
+    await stopServer(server.child);
+    server = await startServer(databaseUrl);
+
+    const after = await getJson(server.url, "/api/recipes");
+    expect(after.some((recipe) => recipe.name === "Pancakes")).toBe(false);
+  });
 });

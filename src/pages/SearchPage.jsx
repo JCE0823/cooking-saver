@@ -16,10 +16,13 @@ export function SearchPage() {
   const [saveError, setSaveError] = useState("");
   const [saveFieldErrors, setSaveFieldErrors] = useState({});
   const queryRef = useRef(query);
+  const searchRequestRef = useRef(0);
   const generationRequestRef = useRef(0);
 
   async function submitSearch(event) {
     event.preventDefault();
+    const requestToken = ++searchRequestRef.current;
+    const requestedQuery = query;
     generationRequestRef.current += 1;
     setStatus("loading");
     setError("");
@@ -32,29 +35,33 @@ export function SearchPage() {
 
     try {
       const results = await api.searchRecipes(query);
+      if (requestToken !== searchRequestRef.current || requestedQuery !== queryRef.current) return;
       setMatches(results);
       if (results.length === 0) {
         setStatus("not-found");
       } else if (results.length === 1) {
-        await openRecipe(results[0].id);
+        await openRecipe(results[0].id, requestToken);
       } else {
         setStatus("matches");
       }
     } catch (requestError) {
+      if (requestToken !== searchRequestRef.current || requestedQuery !== queryRef.current) return;
       setError(requestError.message);
       setStatus("error");
     }
   }
 
-  async function openRecipe(id) {
+  async function openRecipe(id, requestToken = searchRequestRef.current) {
     setStatus("loading");
     setError("");
 
     try {
       const openedRecipe = await api.getRecipe(id);
+      if (requestToken !== searchRequestRef.current) return;
       setRecipe(openedRecipe);
       setStatus("recipe");
     } catch (requestError) {
+      if (requestToken !== searchRequestRef.current) return;
       setError(requestError.message);
       setStatus("error");
     }

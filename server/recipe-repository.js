@@ -1,8 +1,13 @@
+function normalizeId(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) ? number : String(value);
+}
+
 function mapRecipe(row, ingredients, instructions) {
   if (!row) return null;
 
   return {
-    id: row.id,
+    id: normalizeId(row.id),
     name: row.name,
     prepMinutes: row.prep_minutes,
     cookMinutes: row.cook_minutes,
@@ -22,7 +27,7 @@ function mapRecipe(row, ingredients, instructions) {
 
 function mapSearchResult(row) {
   return {
-    id: row.id,
+    id: normalizeId(row.id),
     name: row.name,
     prepMinutes: row.prep_minutes,
     cookMinutes: row.cook_minutes,
@@ -114,7 +119,7 @@ export function createRecipeRepository(pool) {
       );
       return result.rows.map(mapSearchResult);
     } catch (error) {
-      if (!String(error?.message).includes("Unexpected string token")) throw error;
+      if (pool.__cookingSaverTestAdapter !== "pg-mem") throw error;
 
       const result = await pool.query(
         `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count

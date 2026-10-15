@@ -9,6 +9,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "server",
+          fileParallelism: false,
           include: ["test/**/*.test.js"],
           environment: "node",
           setupFiles: ["./test/setup.js"]

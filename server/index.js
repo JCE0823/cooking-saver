@@ -42,6 +42,13 @@ async function start() {
     server = app.listen(config.port, "0.0.0.0", () => {
       console.log(`LISTENING ${server.address().port}`);
     });
+    server.on("error", async (error) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      console.error(safeError(error));
+      await pool?.end();
+      process.exitCode = 1;
+    });
   } catch (error) {
     console.error(safeError(error));
     await pool?.end();
