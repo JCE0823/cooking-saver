@@ -4,6 +4,7 @@ import * as api from "./api.js";
 import { GoogleSignIn } from "./components/GoogleSignIn.jsx";
 import { SearchPage } from "./pages/SearchPage.jsx";
 import { RecipesPage } from "./pages/RecipesPage.jsx";
+import { SharedRecipesPage } from "./pages/SharedRecipesPage.jsx";
 
 export function App() {
   const [status, setStatus] = useState("loading");
@@ -93,6 +94,7 @@ export function App() {
             <nav aria-label="Main navigation">
               <NavLink to="/" end>Search</NavLink>
               <NavLink to="/recipes">My Recipes</NavLink>
+              {user.role === "owner" ? <NavLink to="/shared-recipes">Shared Recipes</NavLink> : null}
               <span className="signed-in-user">
                 {user.pictureUrl ? (
                   <img
@@ -112,6 +114,7 @@ export function App() {
             <Routes>
               <Route path="/" element={<SearchPage />} />
               <Route path="/recipes" element={<RecipesPage />} />
+              <Route path="/shared-recipes" element={<SharedRecipesPage canManage={user.role === "owner"} />} />
             </Routes>
           </main>
         </div>

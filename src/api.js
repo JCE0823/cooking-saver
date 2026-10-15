@@ -94,3 +94,25 @@ export function deleteRecipe(id) {
     method: "DELETE"
   });
 }
+
+export const copySharedRecipe = (id) => requestJSON(
+  `/api/recipes/${encodeURIComponent(id)}/copy`,
+  { method: "POST" }
+);
+
+export const listSharedRecipes = () => requestJSON("/api/shared-recipes");
+
+export const createSharedRecipe = (recipe) => requestJSON("/api/shared-recipes", {
+  method: "POST",
+  body: JSON.stringify(recipe)
+});
+
+export const updateSharedRecipe = (id, recipe) => requestJSON(
+  `/api/shared-recipes/${encodeURIComponent(id)}`,
+  { method: "PUT", body: JSON.stringify(recipe) }
+);
+
+export const deleteSharedRecipe = (id) => requestJSON(
+  `/api/shared-recipes/${encodeURIComponent(id)}`,
+  { method: "DELETE" }
+);

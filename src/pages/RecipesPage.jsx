@@ -7,6 +7,11 @@ function sourceLabel(source) {
   return source.charAt(0).toUpperCase() + source.slice(1);
 }
 
+function scopeLabel(scope) {
+  if (!scope) return "Personal";
+  return scope.charAt(0).toUpperCase() + scope.slice(1);
+}
+
 export function RecipesPage() {
   const [recipes, setRecipes] = useState([]);
   const [listStatus, setListStatus] = useState("loading");
@@ -193,6 +198,7 @@ export function RecipesPage() {
               <article aria-labelledby={`recipe-summary-${recipe.id}`}>
                 <h2 id={`recipe-summary-${recipe.id}`}>{recipe.name}</h2>
                 <p>Source: {sourceLabel(recipe.source)}</p>
+                <p>Scope: {scopeLabel(recipe.scope)}</p>
                 <p>
                   Viewed {recipe.viewCount ?? 0} time{(recipe.viewCount ?? 0) === 1 ? "" : "s"}
                 </p>

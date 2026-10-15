@@ -75,4 +75,31 @@ describe("SearchPage", () => {
     expect(screen.queryByRole("button", { name: "Older Soup" })).not.toBeInTheDocument();
     expect(search).toHaveBeenCalledTimes(2);
   });
+
+  it("copies a shared search result", async () => {
+    vi.spyOn(api, "searchRecipes").mockResolvedValue([
+      { id: 8, name: "Pancakes", source: "starter", scope: "shared", viewCount: 0 }
+    ]);
+    vi.spyOn(api, "getRecipe").mockResolvedValue({
+      ...recipe,
+      id: 8,
+      name: "Pancakes",
+      source: "starter",
+      scope: "shared"
+    });
+    const copy = vi.spyOn(api, "copySharedRecipe").mockResolvedValue({
+      ...recipe,
+      id: 18,
+      name: "Pancakes",
+      scope: "personal"
+    });
+
+    render(<SearchPage />);
+    await userEvent.type(screen.getByLabelText(/dish name/i), "Pancakes");
+    await userEvent.click(screen.getByRole("button", { name: /^search$/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /save to my recipes/i }));
+
+    expect(copy).toHaveBeenCalledWith(8);
+    expect(await screen.findByRole("status")).toHaveTextContent(/saved to my recipes/i);
+  });
 });

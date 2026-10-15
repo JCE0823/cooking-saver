@@ -3,7 +3,12 @@ function sourceLabel(source) {
   return source.charAt(0).toUpperCase() + source.slice(1);
 }
 
-export function RecipeCard({ recipe }) {
+function scopeLabel(scope) {
+  if (!scope) return "Personal";
+  return scope.charAt(0).toUpperCase() + scope.slice(1);
+}
+
+export function RecipeCard({ recipe, onCopy, copyStatus = "idle" }) {
   const ingredients = recipe.ingredients ?? [];
   const instructions = recipe.instructions ?? [];
   const viewCount = recipe.viewCount ?? 0;
@@ -55,7 +60,21 @@ export function RecipeCard({ recipe }) {
       ) : null}
 
       <p>Source: {sourceLabel(recipe.source)}</p>
+      <p>Scope: {scopeLabel(recipe.scope)}</p>
       <p>Viewed {viewCount} time{viewCount === 1 ? "" : "s"}</p>
+      {recipe.scope === "shared" && onCopy ? (
+        <>
+          <button
+            type="button"
+            onClick={() => onCopy(recipe.id)}
+            disabled={copyStatus === "loading"}
+          >
+            {copyStatus === "loading" ? "Saving…" : "Save to My Recipes"}
+          </button>
+          {copyStatus === "saved" ? <p role="status">Saved to My Recipes.</p> : null}
+          {copyStatus === "error" ? <p role="alert">Couldn&apos;t save this recipe. Please try again.</p> : null}
+        </>
+      ) : null}
     </article>
   );
 }

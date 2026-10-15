@@ -8,6 +8,7 @@ const summary = {
   id: 7,
   name: "Tomato Soup",
   source: "manual",
+  scope: "personal",
   viewCount: 3
 };
 
@@ -34,6 +35,7 @@ describe("RecipesPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Tomato Soup" })).toBeVisible();
     expect(screen.getByText(/source: manual/i)).toBeVisible();
+    expect(screen.getByText(/scope: personal/i)).toBeVisible();
     expect(screen.getByText(/viewed 3 times/i)).toBeVisible();
   });
 

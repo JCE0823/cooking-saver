@@ -3,6 +3,11 @@ import * as api from "../api.js";
 import { RecipeCard } from "../components/RecipeCard.jsx";
 import { RecipeForm } from "../components/RecipeForm.jsx";
 
+function scopeLabel(scope) {
+  if (!scope) return "Personal";
+  return scope.charAt(0).toUpperCase() + scope.slice(1);
+}
+
 export function SearchPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("idle");
@@ -15,6 +20,7 @@ export function SearchPage() {
   const [saveStatus, setSaveStatus] = useState("idle");
   const [saveError, setSaveError] = useState("");
   const [saveFieldErrors, setSaveFieldErrors] = useState({});
+  const [copyStatus, setCopyStatus] = useState("idle");
   const queryRef = useRef(query);
   const searchRequestRef = useRef(0);
   const generationRequestRef = useRef(0);
@@ -32,6 +38,7 @@ export function SearchPage() {
     setGenerationError(null);
     setSaveError("");
     setSaveFieldErrors({});
+    setCopyStatus("idle");
 
     try {
       const results = await api.searchRecipes(query);
@@ -54,6 +61,7 @@ export function SearchPage() {
   async function openRecipe(id, requestToken = searchRequestRef.current) {
     setStatus("loading");
     setError("");
+    setCopyStatus("idle");
 
     try {
       const openedRecipe = await api.getRecipe(id);
@@ -64,6 +72,17 @@ export function SearchPage() {
       if (requestToken !== searchRequestRef.current) return;
       setError(requestError.message);
       setStatus("error");
+    }
+  }
+
+  async function copyRecipe(id) {
+    if (copyStatus === "loading") return;
+    setCopyStatus("loading");
+    try {
+      await api.copySharedRecipe(id);
+      setCopyStatus("saved");
+    } catch {
+      setCopyStatus("error");
     }
   }
 
@@ -160,13 +179,16 @@ export function SearchPage() {
                 <button type="button" onClick={() => openRecipe(match.id)}>
                   {match.name}
                 </button>
+                <span className="scope-label">Scope: {scopeLabel(match.scope)}</span>
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      {status === "recipe" && recipe ? <RecipeCard recipe={recipe} /> : null}
+      {status === "recipe" && recipe ? (
+        <RecipeCard recipe={recipe} onCopy={copyRecipe} copyStatus={copyStatus} />
+      ) : null}
 
       {status === "not-found" ? (
         <section aria-labelledby="not-found-heading">

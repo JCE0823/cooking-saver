@@ -33,6 +33,14 @@ const normalUser = {
   role: "user"
 };
 
+const ownerUser = {
+  ...normalUser,
+  id: 2,
+  email: "owner@example.com",
+  displayName: "Owner User",
+  role: "owner"
+};
+
 describe("application shell", () => {
   it("restores an existing session", async () => {
     vi.spyOn(api, "getPublicConfig").mockResolvedValue({ googleClientId: "client-123" });
@@ -54,6 +62,15 @@ describe("application shell", () => {
 
     expect(screen.getByRole("link", { name: /search/i })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /my recipes/i })).toHaveAttribute("href", "/recipes");
+    expect(screen.queryByRole("link", { name: /shared recipes/i })).not.toBeInTheDocument();
+  });
+
+  it("offers shared recipe navigation only to owners", async () => {
+    vi.spyOn(api, "getPublicConfig").mockResolvedValue({ googleClientId: "client-123" });
+    vi.spyOn(api, "getSession").mockResolvedValue({ user: ownerUser });
+
+    render(<App />);
+    expect(await screen.findByRole("link", { name: /shared recipes/i })).toHaveAttribute("href", "/shared-recipes");
   });
 
   it("returns to sign in when a live session expires", async () => {

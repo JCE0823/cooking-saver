@@ -144,6 +144,13 @@ main {
   font-weight: 400;
 }
 
+.scope-label {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .profile-image {
   width: 2rem;
   height: 2rem;
@@ -312,7 +319,8 @@ li + li {
 }
 
 section[aria-labelledby="matches-heading"] ul,
-ul[aria-label="Saved recipes"] {
+ul[aria-label="Saved recipes"],
+ul[aria-label="Shared recipes"] {
   display: grid;
   gap: 0.8rem;
   padding: 0;
@@ -328,15 +336,18 @@ section[aria-labelledby="matches-heading"] button {
   text-align: left;
 }
 
-ul[aria-label="Saved recipes"] article {
+ul[aria-label="Saved recipes"] article,
+ul[aria-label="Shared recipes"] article {
   height: 100%;
 }
 
-ul[aria-label="Saved recipes"] li {
+ul[aria-label="Saved recipes"] li,
+ul[aria-label="Shared recipes"] li {
   margin: 0;
 }
 
 ul[aria-label="Saved recipes"] article button + button,
+ul[aria-label="Shared recipes"] article button + button,
 section[role="dialog"] button + button {
   margin-left: 0.5rem;
 }
@@ -402,7 +413,8 @@ fieldset button[type="button"]:hover:not(:disabled) {
     padding-top: 3rem;
   }
 
-  ul[aria-label="Saved recipes"] {
+  ul[aria-label="Saved recipes"],
+  ul[aria-label="Shared recipes"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
