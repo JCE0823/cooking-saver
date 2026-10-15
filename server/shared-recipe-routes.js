@@ -39,12 +39,12 @@ function parseRecipeBody(request, response) {
 export function createSharedRecipeRouter({ repository }) {
   const router = express.Router();
 
-  router.use((request, response, next) => {
+  function requireOwner(request, response, next) {
     if (request.user.role !== "owner") {
       return response.status(403).json({ error: "owner_required" });
     }
     return next();
-  });
+  }
 
   router.get("/", async (_request, response, next) => {
     try {
@@ -54,7 +54,7 @@ export function createSharedRecipeRouter({ repository }) {
     }
   });
 
-  router.post("/", async (request, response, next) => {
+  router.post("/", requireOwner, async (request, response, next) => {
     const input = parseRecipeBody(request, response);
     if (!input) return;
     try {
@@ -64,7 +64,7 @@ export function createSharedRecipeRouter({ repository }) {
     }
   });
 
-  router.put("/:id", async (request, response, next) => {
+  router.put("/:id", requireOwner, async (request, response, next) => {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
     const input = parseRecipeBody(request, response);
@@ -78,7 +78,7 @@ export function createSharedRecipeRouter({ repository }) {
     }
   });
 
-  router.delete("/:id", async (request, response, next) => {
+  router.delete("/:id", requireOwner, async (request, response, next) => {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
     try {

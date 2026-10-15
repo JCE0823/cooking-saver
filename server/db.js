@@ -91,6 +91,11 @@ export async function seedStarterRecipes(pool) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Keep the completion check and all seed writes serialized across multiple
+    // application processes. pg-mem has no advisory-lock implementation.
+    if (pool.__cookingSaverTestAdapter !== "pg-mem") {
+      await client.query("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK_ID]);
+    }
     const completed = await client.query(
       "SELECT 1 FROM seed_installations WHERE seed_name = $1",
       [SEED_VERSION]

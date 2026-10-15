@@ -51,5 +51,10 @@ describe("deployment configuration", () => {
   it("documents development cookies for local HTTP", () => {
     expect(normalizedDeployGuide).toContain("NODE_ENV=development");
     expect(normalizedReadme).toContain("NODE_ENV=development");
+    expect(normalizedDeployGuide).toContain("http://localhost:5173");
+    expect(normalizedDeployGuide).toContain("authorized JavaScript origins");
+    expect(normalizedDeployGuide).toContain("browser frontend origin");
+    expect(normalizedDeployGuide).toContain("last known-good Part A");
+    expect(normalizedDeployGuide).not.toContain("static service available while investigating");
   });
 });

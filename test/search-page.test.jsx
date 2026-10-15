@@ -102,4 +102,19 @@ describe("SearchPage", () => {
     expect(copy).toHaveBeenCalledWith(8);
     expect(await screen.findByRole("status")).toHaveTextContent(/saved to my recipes/i);
   });
+
+  it("shows a safe service-unavailable message instead of the API error", async () => {
+    vi.spyOn(api, "searchRecipes").mockRejectedValue(Object.assign(
+      new Error("Request failed: database_unavailable"),
+      { code: "database_unavailable", status: 503 }
+    ));
+
+    render(<SearchPage />);
+    await userEvent.type(screen.getByLabelText(/dish name/i), "tomato");
+    await userEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/temporarily unavailable/i);
+    expect(alert).not.toHaveTextContent(/database_unavailable|request failed/i);
+  });
 });

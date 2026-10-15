@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../api.js";
 import { RecipeForm } from "../components/RecipeForm.jsx";
+import { userFacingError } from "../error-messages.js";
 
 function sourceLabel(source) {
   if (!source) return "Unknown";
@@ -37,7 +38,7 @@ export function SharedRecipesPage({ canManage = false }) {
       return true;
     } catch (error) {
       setListStatus("error");
-      setListError(error.message);
+      setListError(userFacingError(error));
       return false;
     }
   }
@@ -89,7 +90,7 @@ export function SharedRecipesPage({ canManage = false }) {
       await loadRecipes();
     } catch (error) {
       setSaveStatus("idle");
-      setSaveError(error.message);
+      setSaveError(userFacingError(error));
       setSaveFieldErrors(error.fields ?? {});
       return;
     }
@@ -132,7 +133,7 @@ export function SharedRecipesPage({ canManage = false }) {
       await loadRecipes();
     } catch (error) {
       setDeleteStatus("error");
-      setDeleteError(error.message);
+      setDeleteError(userFacingError(error));
     }
   }
 

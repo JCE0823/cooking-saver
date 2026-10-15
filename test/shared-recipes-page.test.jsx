@@ -75,4 +75,30 @@ describe("SharedRecipesPage", () => {
     expect(screen.queryByRole("button", { name: /edit tomato soup/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /delete tomato soup/i })).not.toBeInTheDocument();
   });
+
+  it("shows a safe owner-only message when the shared endpoint rejects a non-owner", async () => {
+    vi.spyOn(api, "listSharedRecipes").mockRejectedValue(Object.assign(
+      new Error("Request failed: owner_required"),
+      { code: "owner_required", status: 403 }
+    ));
+
+    render(<SharedRecipesPage canManage={false} />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/only the owner can manage shared recipes/i);
+    expect(alert).not.toHaveTextContent(/owner_required|request failed/i);
+  });
+
+  it("shows a safe service-unavailable message", async () => {
+    vi.spyOn(api, "listSharedRecipes").mockRejectedValue(Object.assign(
+      new Error("Request failed: database_unavailable"),
+      { code: "database_unavailable", status: 503 }
+    ));
+
+    render(<SharedRecipesPage canManage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/temporarily unavailable/i);
+    expect(alert).not.toHaveTextContent(/database_unavailable|request failed/i);
+  });
 });

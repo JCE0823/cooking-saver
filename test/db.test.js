@@ -82,6 +82,26 @@ describe("PostgreSQL database", () => {
     expect(result.rows[0].count).toBe(9);
   });
 
+  it.skipIf(!process.env.TEST_DATABASE_URL)("serializes concurrent starter seeding", async () => {
+    pool = createTestPool();
+    await migrateDatabase(pool);
+
+    await Promise.all([
+      seedStarterRecipes(pool),
+      seedStarterRecipes(pool)
+    ]);
+
+    const recipes = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM recipes WHERE source = 'starter'"
+    );
+    const installations = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM seed_installations WHERE seed_name = $1",
+      ["starter-recipes-v1"]
+    );
+    expect(recipes.rows[0].count).toBe(10);
+    expect(installations.rows[0].count).toBe(1);
+  });
+
   it("discovers and records ordered pending migrations", async () => {
     pool = createTestPool();
     const directory = await mkdtemp(join(tmpdir(), "cooking-saver-migrations-"));

@@ -98,6 +98,36 @@ describe("Google authentication", () => {
       .expect(401, { error: "authentication_required" });
   });
 
+  it("clears the cookie and records revocation on sign-out", async () => {
+    const { app } = await setup({ secureCookies: false });
+    const agent = request.agent(app);
+    await agent.post("/api/auth/google")
+      .send({ credential: "verified-google-credential" })
+      .expect(200);
+
+    const response = await agent.post("/api/auth/sign-out").expect(204);
+    expect(response.headers["set-cookie"][0]).toMatch(
+      /^cooking_saver_session=; Max-Age=0; Path=\/; HttpOnly; SameSite=Lax$/
+    );
+    const stored = await pool.query("SELECT revoked_at FROM sessions");
+    expect(stored.rows[0].revoked_at).not.toBeNull();
+  });
+
+  it("rejects an expired session", async () => {
+    const { app } = await setup({ secureCookies: false });
+    const agent = request.agent(app);
+    await agent.post("/api/auth/google")
+      .send({ credential: "verified-google-credential" })
+      .expect(200);
+    await pool.query(
+      "UPDATE sessions SET expires_at = $1",
+      [new Date("2029-12-31T23:59:59.000Z")]
+    );
+
+    await agent.get("/api/auth/session")
+      .expect(401, { error: "authentication_required" });
+  });
+
   it("verifies the configured audience and normalizes verified claims", async () => {
     const client = {
       verifyIdToken: vi.fn().mockResolvedValue({

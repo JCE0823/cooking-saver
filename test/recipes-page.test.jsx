@@ -124,4 +124,17 @@ describe("RecipesPage", () => {
     expect(screen.getByRole("heading", { name: "Tomato Soup" })).toBeVisible();
     expect(screen.getByRole("button", { name: /retry delete/i })).toBeVisible();
   });
+
+  it("shows a safe service-unavailable message instead of the API error", async () => {
+    vi.spyOn(api, "listRecipes").mockRejectedValue(Object.assign(
+      new Error("Request failed: database_unavailable"),
+      { code: "database_unavailable", status: 503 }
+    ));
+
+    render(<RecipesPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/temporarily unavailable/i);
+    expect(alert).not.toHaveTextContent(/database_unavailable|request failed/i);
+  });
 });

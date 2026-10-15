@@ -41,6 +41,13 @@ describe("API authentication and deployment metadata", () => {
       .expect(401, { error: "authentication_required" });
   });
 
+  it("rejects malformed session cookies", async () => {
+    await request(createTestApp())
+      .get("/api/recipes")
+      .set("Cookie", "cooking_saver_session=%ZZ")
+      .expect(401, { error: "authentication_required" });
+  });
+
   it("leaves version public while protecting health", async () => {
     const app = createTestApp();
 
@@ -109,6 +116,14 @@ describe("API authentication and deployment metadata", () => {
       commit: "abc123",
       port: 4312
     });
+
+    expect(loadConfig({
+      DATABASE_URL: "postgres://private",
+      GOOGLE_CLIENT_ID: "google-client-id",
+      OWNER_EMAIL: "owner@example.com",
+      FRONTEND_ORIGIN: "https://frontend.example",
+      NODE_ENV: "production"
+    }).allowedOrigins).toEqual(["https://frontend.example"]);
 
     expect(() => loadConfig({
       DATABASE_URL: "postgres://private",

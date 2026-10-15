@@ -26,7 +26,10 @@ export function loadConfig(env = process.env) {
   if (configuredOrigins.length === 0) {
     throw new Error("FRONTEND_ORIGIN must contain at least one origin");
   }
-  const allowedOrigins = [...new Set([...configuredOrigins, ...LOCAL_ORIGINS])];
+  const allowedOrigins = [...new Set([
+    ...configuredOrigins,
+    ...(env.NODE_ENV === "development" ? LOCAL_ORIGINS : [])
+  ])];
 
   const port = env.PORT === undefined || env.PORT === "" ? 3000 : Number(env.PORT);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {

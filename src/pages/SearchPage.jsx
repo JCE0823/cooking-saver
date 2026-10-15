@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import * as api from "../api.js";
 import { RecipeCard } from "../components/RecipeCard.jsx";
 import { RecipeForm } from "../components/RecipeForm.jsx";
+import { userFacingError } from "../error-messages.js";
 
 function scopeLabel(scope) {
   if (!scope) return "Personal";
@@ -53,7 +54,7 @@ export function SearchPage() {
       }
     } catch (requestError) {
       if (requestToken !== searchRequestRef.current || requestedQuery !== queryRef.current) return;
-      setError(requestError.message);
+      setError(userFacingError(requestError));
       setStatus("error");
     }
   }
@@ -70,7 +71,7 @@ export function SearchPage() {
       setStatus("recipe");
     } catch (requestError) {
       if (requestToken !== searchRequestRef.current) return;
-      setError(requestError.message);
+      setError(userFacingError(requestError));
       setStatus("error");
     }
   }
@@ -122,7 +123,7 @@ export function SearchPage() {
       setStatus("recipe");
     } catch (requestError) {
       setSaveStatus("idle");
-      setSaveError(requestError.message);
+      setSaveError(userFacingError(requestError));
       setSaveFieldErrors(requestError.fields ?? {});
     }
   }

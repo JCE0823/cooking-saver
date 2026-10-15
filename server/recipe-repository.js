@@ -183,7 +183,7 @@ export function createRecipeRepository(pool) {
   async function copyShared(id, userId) {
     return withTransaction(pool, async (client) => {
       const parentResult = await client.query(
-        "SELECT * FROM recipes WHERE id = $1 AND owner_user_id IS NULL",
+        "SELECT * FROM recipes WHERE id = $1 AND owner_user_id IS NULL FOR SHARE",
         [id]
       );
       const parent = parentResult.rows[0];

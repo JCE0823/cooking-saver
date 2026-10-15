@@ -112,6 +112,32 @@ describe("recipe authorization", () => {
     expect(original.body.name).toBe(recipeInput.name);
   });
 
+  it("allows normal users to read shared recipes", async () => {
+    const app = await createTestApp();
+    await asUser(app, "owner", "post", "/api/shared-recipes")
+      .send(recipeInput).expect(201);
+
+    const response = await asUser(app, "userOne", "get", "/api/shared-recipes")
+      .expect(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0]).toMatchObject({ name: recipeInput.name, scope: "shared" });
+  });
+
+  it("keeps a copied recipe after the shared source is deleted", async () => {
+    const app = await createTestApp();
+    const shared = await asUser(app, "owner", "post", "/api/shared-recipes")
+      .send(recipeInput).expect(201);
+    const copied = await asUser(app, "userOne", "post", `/api/recipes/${shared.body.id}/copy`)
+      .expect(201);
+
+    await asUser(app, "owner", "delete", `/api/shared-recipes/${shared.body.id}`).expect(204);
+    const personal = await asUser(app, "userOne", "get", `/api/recipes/${copied.body.id}`)
+      .expect(200);
+    expect(personal.body).toMatchObject({ id: copied.body.id, name: recipeInput.name, scope: "personal" });
+    expect(personal.body.ingredients).toEqual(recipeInput.ingredients);
+    expect(personal.body.instructions).toEqual(recipeInput.instructions);
+  });
+
   it("allows only the owner to mutate shared recipes", async () => {
     const app = await createTestApp();
     await asUser(app, "userOne", "post", "/api/shared-recipes")
