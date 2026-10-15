@@ -26,7 +26,7 @@ describe("sign in", () => {
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/api/recipes",
+      "/api/recipes",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: `Basic ${btoa("student:secret")}` })
       })
