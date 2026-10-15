@@ -3,7 +3,6 @@ import cors from "cors";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBasicAuth } from "./basic-auth.js";
 import { createAuthRouter } from "./auth-routes.js";
 import { createGenerationRouter } from "./generation-route.js";
 import { createRecipeRouter } from "./recipe-routes.js";
@@ -45,7 +44,6 @@ export function createApp({
   repository,
   authRepository,
   generateRecipe,
-  auth,
   verifier,
   ownerEmail,
   googleClientId,
@@ -84,22 +82,16 @@ export function createApp({
   });
 
   const sessionRepository = authRepository || repository;
-  if (verifier && sessionRepository && ownerEmail) {
-    app.use("/api", createAuthRouter({
-      verifier,
-      repository: sessionRepository,
-      ownerEmail,
-      googleClientId,
-      secureCookies,
-      now,
-      randomToken
-    }));
-    app.use("/api", createSessionAuth({ repository: sessionRepository, ownerEmail, now }));
-  } else if (auth) {
-    // Kept as a compatibility seam for the Part A test harness until the
-    // remaining server tests are converted to session cookies.
-    app.use("/api", createBasicAuth(auth));
-  }
+  app.use("/api", createAuthRouter({
+    verifier,
+    repository: sessionRepository,
+    ownerEmail,
+    googleClientId,
+    secureCookies,
+    now,
+    randomToken
+  }));
+  app.use("/api", createSessionAuth({ repository: sessionRepository, ownerEmail, now }));
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true });

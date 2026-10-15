@@ -3,6 +3,7 @@ import request from "supertest";
 import { createApp } from "../server/app.js";
 import { createGoogleVerifier } from "../server/google-verifier.js";
 import { migrateDatabase } from "../server/db.js";
+import { newSessionToken } from "../server/session-auth.js";
 import { createUserSessionRepository } from "../server/user-session-repository.js";
 import { createTestPool } from "./postgres.js";
 
@@ -41,6 +42,11 @@ async function setup({ secureCookies = true } = {}) {
 }
 
 describe("Google authentication", () => {
+  it("creates a 32-byte random session token representation", () => {
+    const token = newSessionToken();
+    expect(Buffer.from(token, "base64url")).toHaveLength(32);
+  });
+
   it("exposes only the public Google client configuration", async () => {
     const { app } = await setup();
     await request(app).get("/api/config").expect(200, { googleClientId: "client-123" });
