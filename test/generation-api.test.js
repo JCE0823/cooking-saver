@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../server/app.js";
-import { openDatabase } from "../server/db.js";
+import { migrateDatabase } from "../server/db.js";
+import { createRecipeRepository } from "../server/recipe-repository.js";
+import { createTestPool } from "./postgres.js";
 
 const validRecipe = {
   name: "Lentil Stew",
@@ -14,9 +16,17 @@ const validRecipe = {
   instructions: ["Simmer the lentils until tender."]
 };
 
-let db;
+let pool;
 
-afterEach(() => db?.close());
+afterEach(async () => {
+  await pool?.end();
+});
+
+async function createTestApp(options = {}) {
+  pool = createTestPool();
+  await migrateDatabase(pool);
+  return createApp({ repository: createRecipeRepository(pool), ...options });
+}
 
 describe("recipe generation API", () => {
   it("returns a validated unsaved AI preview", async () => {
@@ -25,8 +35,7 @@ describe("recipe generation API", () => {
       name: "Ethiopian Lentil Stew",
       source: "manual"
     });
-    db = openDatabase(":memory:");
-    const app = createApp({ db, generateRecipe });
+    const app = await createTestApp({ generateRecipe });
 
     const response = await request(app)
       .post("/api/generate")
@@ -37,13 +46,13 @@ describe("recipe generation API", () => {
     expect(response.body.source).toBe("ai");
     expect(response.body.name).toBe("Ethiopian Lentil Stew");
     expect(generateRecipe).toHaveBeenCalledWith("Ethiopian lentil stew");
-    expect(db.prepare("SELECT COUNT(*) AS count FROM recipes WHERE source = 'ai'").get().count).toBe(0);
+    const result = await pool.query("SELECT COUNT(*)::int AS count FROM recipes WHERE source = 'ai'");
+    expect(result.rows[0].count).toBe(0);
   });
 
   it("turns generator failure into a retryable response", async () => {
     const generateRecipe = vi.fn().mockRejectedValue(new Error("timeout"));
-    db = openDatabase(":memory:");
-    const app = createApp({ db, generateRecipe });
+    const app = await createTestApp({ generateRecipe });
 
     const response = await request(app)
       .post("/api/generate")
@@ -54,8 +63,7 @@ describe("recipe generation API", () => {
   });
 
   it("reports unavailable generation when no generator is configured", async () => {
-    db = openDatabase(":memory:");
-    const app = createApp({ db });
+    const app = await createTestApp();
 
     await request(app)
       .post("/api/generate")
@@ -65,8 +73,7 @@ describe("recipe generation API", () => {
 
   it("validates and trims the dish name before generation", async () => {
     const generateRecipe = vi.fn().mockResolvedValue(validRecipe);
-    db = openDatabase(":memory:");
-    const app = createApp({ db, generateRecipe });
+    const app = await createTestApp({ generateRecipe });
 
     await request(app).post("/api/generate").send({ dishName: "   " }).expect(400);
     await request(app).post("/api/generate").send({ dishName: "x".repeat(101) }).expect(400);
@@ -75,12 +82,12 @@ describe("recipe generation API", () => {
 
   it("rejects an incomplete provider response without saving it", async () => {
     const generateRecipe = vi.fn().mockResolvedValue({ ...validRecipe, ingredients: [] });
-    db = openDatabase(":memory:");
-    const app = createApp({ db, generateRecipe });
+    const app = await createTestApp({ generateRecipe });
 
     await request(app).post("/api/generate").send({ dishName: "Soup" }).expect(502, {
       error: "generation_failed"
     });
-    expect(db.prepare("SELECT COUNT(*) AS count FROM recipes WHERE source = 'ai'").get().count).toBe(0);
+    const result = await pool.query("SELECT COUNT(*)::int AS count FROM recipes WHERE source = 'ai'");
+    expect(result.rows[0].count).toBe(0);
   });
 });

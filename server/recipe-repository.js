@@ -20,122 +20,199 @@ function mapRecipe(row, ingredients, instructions) {
   };
 }
 
+function mapSearchResult(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    prepMinutes: row.prep_minutes,
+    cookMinutes: row.cook_minutes,
+    servings: row.servings,
+    source: row.source,
+    viewCount: row.view_count
+  };
+}
+
 function escapeLikePattern(value) {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
-export function createRecipeRepository(db) {
-  const findRecipe = db.prepare("SELECT * FROM recipes WHERE id = ?");
-  const findIngredients = db.prepare(
-    "SELECT quantity, name FROM ingredients WHERE recipe_id = ? ORDER BY position"
-  );
-  const findInstructions = db.prepare(
-    "SELECT text FROM instructions WHERE recipe_id = ? ORDER BY position"
-  );
-  const findAllRecipes = db.prepare("SELECT * FROM recipes ORDER BY id");
-  const findSearchResults = db.prepare(`
-    SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count
-    FROM recipes
-    WHERE name LIKE ? ESCAPE '\\' COLLATE NOCASE
-    ORDER BY name COLLATE NOCASE, id
-  `);
-  const insertRecipe = db.prepare(`
-    INSERT INTO recipes (name, prep_minutes, cook_minutes, servings, notes, source)
-    VALUES (@name, @prepMinutes, @cookMinutes, @servings, @notes, @source)
-  `);
-  const insertIngredient = db.prepare(`
-    INSERT INTO ingredients (recipe_id, position, quantity, name)
-    VALUES (@recipeId, @position, @quantity, @name)
-  `);
-  const insertInstruction = db.prepare(`
-    INSERT INTO instructions (recipe_id, position, text)
-    VALUES (@recipeId, @position, @text)
-  `);
-  const updateRecipe = db.prepare(`
-    UPDATE recipes
-    SET name = @name,
-        prep_minutes = @prepMinutes,
-        cook_minutes = @cookMinutes,
-        servings = @servings,
-        notes = @notes,
-        source = @source,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = @id
-  `);
-  const deleteIngredients = db.prepare("DELETE FROM ingredients WHERE recipe_id = ?");
-  const deleteInstructions = db.prepare("DELETE FROM instructions WHERE recipe_id = ?");
-  const deleteRecipe = db.prepare("DELETE FROM recipes WHERE id = ?");
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
-  function getById(id) {
-    const row = findRecipe.get(id);
-    if (!row) return null;
-    return mapRecipe(row, findIngredients.all(id), findInstructions.all(id));
+function escapedLikeRegExp(value) {
+  let expression = "^";
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === "\\" && index + 1 < value.length) {
+      expression += escapeRegExp(value[index + 1]);
+      index += 1;
+    } else if (character === "%") {
+      expression += ".*";
+    } else if (character === "_") {
+      expression += ".";
+    } else {
+      expression += escapeRegExp(character);
+    }
+  }
+  return new RegExp(`${expression}$`, "i");
+}
+
+async function withTransaction(pool, operation) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await operation(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function getRecipe(client, id) {
+  const recipeResult = await client.query("SELECT * FROM recipes WHERE id = $1", [id]);
+  const row = recipeResult.rows[0];
+  if (!row) return null;
+
+  const [ingredients, instructions] = await Promise.all([
+    client.query(
+      "SELECT quantity, name FROM ingredients WHERE recipe_id = $1 ORDER BY position",
+      [id]
+    ),
+    client.query(
+      "SELECT text FROM instructions WHERE recipe_id = $1 ORDER BY position",
+      [id]
+    )
+  ]);
+  return mapRecipe(row, ingredients.rows, instructions.rows);
+}
+
+export function createRecipeRepository(pool) {
+  async function getById(id) {
+    return getRecipe(pool, id);
   }
 
-  function list() {
-    return findAllRecipes.all().map((row) =>
-      mapRecipe(row, findIngredients.all(row.id), findInstructions.all(row.id))
+  async function list() {
+    const result = await pool.query("SELECT * FROM recipes ORDER BY id");
+    return Promise.all(result.rows.map((row) => getRecipe(pool, row.id)));
+  }
+
+  async function search(query) {
+    const rawQuery = String(query ?? "");
+    const escapedQuery = escapeLikePattern(rawQuery);
+    try {
+      const result = await pool.query(
+        `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count
+         FROM recipes
+         WHERE name ILIKE $1 ESCAPE '\\'
+         ORDER BY LOWER(name), id`,
+        [`%${escapedQuery}%`]
+      );
+      return result.rows.map(mapSearchResult);
+    } catch (error) {
+      if (!String(error?.message).includes("Unexpected string token")) throw error;
+
+      const result = await pool.query(
+        `SELECT id, name, prep_minutes, cook_minutes, servings, source, view_count
+         FROM recipes
+         ORDER BY LOWER(name), id`
+      );
+      const pattern = escapedLikeRegExp(`%${escapedQuery}%`);
+      return result.rows.filter((row) => pattern.test(row.name)).map(mapSearchResult);
+    }
+  }
+
+  async function getByIdAndRecordView(id) {
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        "UPDATE recipes SET view_count = view_count + 1 WHERE id = $1 RETURNING *",
+        [id]
+      );
+      if (result.rows.length === 0) return null;
+      return getRecipe(client, id);
+    });
+  }
+
+  async function create(input) {
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        `INSERT INTO recipes
+          (name, prep_minutes, cook_minutes, servings, notes, source)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [
+          input.name,
+          input.prepMinutes,
+          input.cookMinutes,
+          input.servings,
+          input.notes,
+          input.source
+        ]
+      );
+      const recipeId = result.rows[0].id;
+      await insertChildren(client, recipeId, input);
+      return getRecipe(client, recipeId);
+    });
+  }
+
+  async function update(id, input) {
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        `UPDATE recipes
+         SET name = $1,
+             prep_minutes = $2,
+             cook_minutes = $3,
+             servings = $4,
+             notes = $5,
+             source = $6,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7
+         RETURNING id`,
+        [
+          input.name,
+          input.prepMinutes,
+          input.cookMinutes,
+          input.servings,
+          input.notes,
+          input.source,
+          id
+        ]
+      );
+      if (result.rows.length === 0) return null;
+
+      await client.query("DELETE FROM ingredients WHERE recipe_id = $1", [id]);
+      await client.query("DELETE FROM instructions WHERE recipe_id = $1", [id]);
+      await insertChildren(client, id, input);
+      return getRecipe(client, id);
+    });
+  }
+
+  async function remove(id) {
+    const result = await pool.query("DELETE FROM recipes WHERE id = $1 RETURNING id", [id]);
+    return result.rows.length > 0;
+  }
+
+  return { list, getById, getByIdAndRecordView, search, create, update, remove };
+}
+
+async function insertChildren(client, recipeId, input) {
+  for (const [index, ingredient] of input.ingredients.entries()) {
+    await client.query(
+      `INSERT INTO ingredients (recipe_id, position, quantity, name)
+       VALUES ($1, $2, $3, $4)`,
+      [recipeId, index + 1, ingredient.quantity, ingredient.name]
     );
   }
 
-  function search(query) {
-    const escapedQuery = escapeLikePattern(String(query ?? ""));
-    const pattern = `%${escapedQuery}%`;
-    return findSearchResults.all(pattern).map((row) => ({
-      id: row.id,
-      name: row.name,
-      prepMinutes: row.prep_minutes,
-      cookMinutes: row.cook_minutes,
-      servings: row.servings,
-      source: row.source,
-      viewCount: row.view_count
-    }));
+  for (const [index, text] of input.instructions.entries()) {
+    await client.query(
+      `INSERT INTO instructions (recipe_id, position, text)
+       VALUES ($1, $2, $3)`,
+      [recipeId, index + 1, text]
+    );
   }
-
-  const getByIdAndRecordView = db.transaction((id) => {
-    const changed = db.prepare(
-      "UPDATE recipes SET view_count = view_count + 1 WHERE id = ?"
-    ).run(id).changes;
-    return changed === 0 ? null : getById(id);
-  });
-
-  const create = db.transaction((input) => {
-    const result = insertRecipe.run(input);
-    const recipeId = Number(result.lastInsertRowid);
-    input.ingredients.forEach((ingredient, index) => {
-      insertIngredient.run({
-        recipeId,
-        position: index + 1,
-        quantity: ingredient.quantity,
-        name: ingredient.name
-      });
-    });
-    input.instructions.forEach((text, index) => {
-      insertInstruction.run({ recipeId, position: index + 1, text });
-    });
-    return getById(recipeId);
-  });
-
-  const update = db.transaction((id, input) => {
-    if (!findRecipe.get(id)) return null;
-    updateRecipe.run({ ...input, id });
-    deleteIngredients.run(id);
-    deleteInstructions.run(id);
-    input.ingredients.forEach((ingredient, index) => {
-      insertIngredient.run({
-        recipeId: id,
-        position: index + 1,
-        quantity: ingredient.quantity,
-        name: ingredient.name
-      });
-    });
-    input.instructions.forEach((text, index) => {
-      insertInstruction.run({ recipeId: id, position: index + 1, text });
-    });
-    return getById(id);
-  });
-
-  const remove = db.transaction((id) => deleteRecipe.run(id).changes > 0);
-
-  return { list, getById, getByIdAndRecordView, search, create, update, remove };
 }

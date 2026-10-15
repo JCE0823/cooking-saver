@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../server/app.js";
-import { openDatabase } from "../server/db.js";
+import { migrateDatabase } from "../server/db.js";
+import { createRecipeRepository } from "../server/recipe-repository.js";
+import { createTestPool } from "./postgres.js";
 
 const validRecipe = {
   name: "Tomato Soup",
@@ -14,18 +16,27 @@ const validRecipe = {
   instructions: ["Chop the tomatoes.", "Simmer until tender."]
 };
 
-let db;
+let pool;
 
-afterEach(() => db?.close());
+afterEach(async () => {
+  await pool?.end();
+});
 
 describe("recipe API", () => {
   it("creates, updates, and deletes a complete recipe", async () => {
-    db = openDatabase(":memory:");
-    const app = createApp({ db });
+    pool = createTestPool();
+    await migrateDatabase(pool);
+    const repository = createRecipeRepository(pool);
+    const app = createApp({ repository });
 
     const created = await request(app).post("/api/recipes").send(validRecipe).expect(201);
     expect(created.body.name).toBe("Tomato Soup");
     expect(created.body.ingredients).toEqual(validRecipe.ingredients);
+    const persisted = await pool.query(
+      "SELECT name, servings FROM recipes WHERE id = $1",
+      [created.body.id]
+    );
+    expect(persisted.rows[0]).toEqual({ name: "Tomato Soup", servings: 4 });
 
     const updated = await request(app)
       .put(`/api/recipes/${created.body.id}`)
@@ -38,8 +49,10 @@ describe("recipe API", () => {
   });
 
   it("rejects a recipe without ingredients", async () => {
-    db = openDatabase(":memory:");
-    const app = createApp({ db });
+    pool = createTestPool();
+    await migrateDatabase(pool);
+    const repository = createRecipeRepository(pool);
+    const app = createApp({ repository });
 
     const response = await request(app)
       .post("/api/recipes")
@@ -49,11 +62,13 @@ describe("recipe API", () => {
   });
 
   it("preserves the view count when updating recipe content", async () => {
-    db = openDatabase(":memory:");
-    const app = createApp({ db });
+    pool = createTestPool();
+    await migrateDatabase(pool);
+    const repository = createRecipeRepository(pool);
+    const app = createApp({ repository });
 
     const created = await request(app).post("/api/recipes").send(validRecipe).expect(201);
-    db.prepare("UPDATE recipes SET view_count = 7 WHERE id = ?").run(created.body.id);
+    await pool.query("UPDATE recipes SET view_count = 7 WHERE id = $1", [created.body.id]);
 
     const updated = await request(app)
       .put(`/api/recipes/${created.body.id}`)

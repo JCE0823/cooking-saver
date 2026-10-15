@@ -7,7 +7,7 @@ import { createRecipeRouter } from "./recipe-routes.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-export function createApp({ db, generateRecipe } = {}) {
+export function createApp({ repository, generateRecipe } = {}) {
   const app = express();
   app.use(express.json());
 
@@ -20,8 +20,8 @@ export function createApp({ db, generateRecipe } = {}) {
     app.use(express.static(distPath));
   }
 
-  if (db) {
-    app.use("/api/recipes", createRecipeRouter({ db }));
+  if (repository) {
+    app.use("/api/recipes", createRecipeRouter({ repository }));
   }
 
   app.use("/api/generate", createGenerationRouter({ generateRecipe }));

@@ -17,19 +17,13 @@ describe("API error handling", () => {
   });
 
   it("hides unexpected database details behind a generic JSON error", async () => {
-    const databaseError = new Error("SQLITE_CONSTRAINT: private details");
-    const statement = {
-      get: () => { throw databaseError; },
-      all: () => [],
-      run: () => { throw databaseError; }
-    };
-    const db = {
-      prepare: () => statement,
-      transaction: (callback) => callback
+    const databaseError = new Error("PG_CONSTRAINT: private details");
+    const repository = {
+      getByIdAndRecordView: vi.fn().mockRejectedValue(databaseError)
     };
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const response = await request(createApp({ db })).get("/api/recipes/1");
+    const response = await request(createApp({ repository })).get("/api/recipes/1");
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: "internal_server_error" });

@@ -1,6 +1,5 @@
 import express from "express";
 import { recipeInputSchema } from "./recipe-schema.js";
-import { createRecipeRepository } from "./recipe-repository.js";
 
 function parseId(value) {
   if (!/^[1-9]\d*$/.test(value)) return null;
@@ -37,47 +36,72 @@ function parseRecipeBody(request, response) {
   return result.data;
 }
 
-export function createRecipeRouter({ db }) {
+export function createRecipeRouter({ repository }) {
   const router = express.Router();
-  const repository = createRecipeRepository(db);
 
-  router.get("/", (_request, response) => {
-    response.json(repository.list());
+  router.get("/", async (_request, response, next) => {
+    try {
+      response.json(await repository.list());
+    } catch (error) {
+      next(error);
+    }
   });
 
-  router.get("/search", (request, response) => {
-    response.json(repository.search(request.query.q));
+  router.get("/search", async (request, response, next) => {
+    try {
+      response.json(await repository.search(request.query.q));
+    } catch (error) {
+      next(error);
+    }
   });
 
-  router.get("/:id", (request, response) => {
+  router.get("/:id", async (request, response, next) => {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
-    const recipe = repository.getByIdAndRecordView(id);
-    if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
-    return response.json(recipe);
+    try {
+      const recipe = await repository.getByIdAndRecordView(id);
+      if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
+      return response.json(recipe);
+    } catch (error) {
+      return next(error);
+    }
   });
 
-  router.post("/", (request, response) => {
+  router.post("/", async (request, response, next) => {
     const input = parseRecipeBody(request, response);
     if (!input) return;
-    response.status(201).json(repository.create(input));
+    try {
+      response.status(201).json(await repository.create(input));
+    } catch (error) {
+      next(error);
+    }
   });
 
-  router.put("/:id", (request, response) => {
+  router.put("/:id", async (request, response, next) => {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
     const input = parseRecipeBody(request, response);
     if (!input) return;
-    const recipe = repository.update(id, input);
-    if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
-    return response.json(recipe);
+    try {
+      const recipe = await repository.update(id, input);
+      if (!recipe) return response.status(404).json({ error: "recipe_not_found" });
+      return response.json(recipe);
+    } catch (error) {
+      return next(error);
+    }
   });
 
-  router.delete("/:id", (request, response) => {
+  router.delete("/:id", async (request, response, next) => {
     const id = parseId(request.params.id);
     if (id === null) return sendInvalidId(response);
-    if (!repository.remove(id)) return response.status(404).json({ error: "recipe_not_found" });
-    return response.status(204).send();
+    try {
+      if (!(await repository.remove(id))) {
+        return response.status(404).json({ error: "recipe_not_found" });
+      }
+      return response.status(204).send();
+    } catch (error) {
+      return next(error);
+    }
   });
 
   return router;
