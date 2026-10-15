@@ -4,6 +4,7 @@ import { parse } from "yaml";
 
 const renderConfig = parse(await readFile(new URL("../render.yaml", import.meta.url), "utf8"));
 const deployGuide = await readFile(new URL("../DEPLOY.md", import.meta.url), "utf8");
+const normalizedDeployGuide = deployGuide.replaceAll("\r\n", "\n");
 
 describe("deployment configuration", () => {
   it("defines the app and API services with checks-pass deploys", () => {
@@ -40,7 +41,7 @@ describe("deployment configuration", () => {
   });
 
   it("starts DEPLOY.md with the fixed PS3 endpoints", () => {
-    expect(deployGuide.startsWith([
+    expect(normalizedDeployGuide.startsWith([
       "App: https://cooking-saver-jce0823.onrender.com",
       "API: https://cooking-saver-api-jce0823.onrender.com",
       "Protected: /api/recipes"
